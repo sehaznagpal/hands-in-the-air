@@ -1,4 +1,5 @@
 import { CameraError, startCamera, type Camera } from './camera';
+import { Chrome } from './chrome';
 import { DebugOverlay } from './debug';
 import { HandSignals } from './hands';
 import { MockHands } from './mock';
@@ -12,8 +13,6 @@ const canvas = $<HTMLCanvasElement>('stage');
 const video = $<HTMLVideoElement>('video');
 const intro = $('intro');
 const startBtn = $<HTMLButtonElement>('start');
-const stopBtn = $<HTMLButtonElement>('stop');
-const toolbar = $('toolbar');
 const useMouseBtn = $<HTMLButtonElement>('use-mouse');
 const message = $('message');
 const overlay = $('overlay');
@@ -21,6 +20,7 @@ const app = $('app');
 const badge = $('mock-badge');
 const g = canvas.getContext('2d')!;
 const debug = new DebugOverlay(app);
+
 const params = new URLSearchParams(location.search);
 const reduced = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false;
 
@@ -95,7 +95,7 @@ const host: Host = {
     detectErrors = 0;
     camera.stream.getVideoTracks()[0]?.addEventListener('ended', () => {
       host.stopTracking();
-      message.textContent = 'The camera was disconnected. Press Start camera to try again.';
+      chrome.setStatus('The camera was disconnected.');
     });
     setTracking(true);
     return null;
@@ -114,6 +114,8 @@ const host: Host = {
   },
 };
 
+const chrome = new Chrome(host, video, size);
+
 function setTracking(on: boolean) {
   tracking = on;
   syncChrome();
@@ -129,7 +131,7 @@ const sceneCtx: SceneContext = {
   size,
   hands: signals,
   host,
-  previewRect: () => null,
+  previewRect: () => chrome.rect(),
   toScreen(x, y) {
     const r = coverRect(size.width, size.height, aspect());
     return { x: r.x + x * r.w, y: r.y + y * r.h };
@@ -151,6 +153,7 @@ function setScene(index: number) {
   scene = scenes[index].create();
   scene.init(sceneCtx);
   menu.value = scenes[index].id;
+  chrome.sceneShown(scenes[index].id, scene.help);
   syncToggle();
   syncChrome();
 }
@@ -177,7 +180,7 @@ function leaveWelcome() {
 }
 
 function syncChrome() {
-  toolbar.hidden = welcome || !tracking;
+  chrome.setVisible(!welcome, unlocked);
   badge.hidden = !host.mock || welcome;
   syncToggle();
 }
@@ -298,7 +301,7 @@ function frame(now: number) {
       console.warn('hand detection failed', err);
       if (++detectErrors > 30) {
         host.stopTracking();
-        message.textContent = 'Hand tracking stopped working. Press Start camera to try again.';
+        chrome.setStatus('Hand tracking stopped working.');
       }
     }
     detectMs += (performance.now() - t0 - detectMs) * 0.1;
@@ -328,6 +331,7 @@ function frame(now: number) {
     scene.draw(g);
     g.restore();
   }
+  chrome.draw(signals);
   debug.draw(g, rect, signals, { fps, detectMs, delegate: tracker?.delegate ?? '-' });
 }
 
@@ -370,7 +374,6 @@ useMouseBtn.addEventListener('click', () => {
   setScene(i);
   leaveWelcome();
 });
-stopBtn.addEventListener('click', () => host.stopTracking());
 window.addEventListener('pagehide', () => host.stopTracking());
 
 syncChrome();

@@ -1,8 +1,7 @@
 import type { HandSignals } from '../../hands';
 import type { Scene, SceneContext } from '../../scene';
 import './mesh.css';
-import { HandController, dialY, stepDial, DIAL_BOTTOM, DIAL_TOP } from './handcontrol';
-import { HandsUI } from './handsui';
+import { HandController, stepDial } from './handcontrol';
 import { BagWorld, MAX_BALLS, BALL_R, type Ball } from './physics';
 import { drawBall, drawMesh } from './render';
 import { getSprites, type BallSet } from './sprites';
@@ -59,7 +58,6 @@ export class MeshScene implements Scene {
   private cleanup: (() => void)[] = [];
 
   private controller = new HandController();
-  private handsUI!: HandsUI;
   private handsOn = false;
 
   private countEl!: HTMLElement;
@@ -72,23 +70,9 @@ export class MeshScene implements Scene {
     this.bindInput();
     this.fitNow();
 
-    this.handsUI = new HandsUI(ctx, async (on) => {
-      if (!on) {
-        ctx.host.stopTracking();
-        return null;
-      }
-      const error = await ctx.host.startTracking();
-      if (!error) this.setHands(true);
-      return error;
-    });
-    this.cleanup.push(() => this.handsUI.dispose());
-    // The camera is shared: if it is already on (started in another scene), hands are on.
-    if (ctx.host.tracking) this.setHands(true);
-    this.cleanup.push(
-      ctx.host.onTrackingChange((tracking) => {
-        if (!tracking) this.setHands(false);
-      }),
-    );
+    // The camera belongs to the app: hands drive the mesh whenever it is on, otherwise mouse and keyboard.
+    this.setHands(ctx.host.tracking);
+    this.cleanup.push(ctx.host.onTrackingChange((tracking) => this.setHands(tracking)));
     // A fast open-hand swipe is a gust of wind.
     this.cleanup.push(
       ctx.hands.on('swipe', (e) => {
@@ -102,7 +86,6 @@ export class MeshScene implements Scene {
   private setHands(on: boolean) {
     this.handsOn = on;
     if (!on) this.controller.reset();
-    this.handsUI.setOn(on);
   }
 
   // ----------------------------------------------------------------- UI
@@ -275,7 +258,6 @@ export class MeshScene implements Scene {
         this.goal.x = grab.x;
         this.goal.y = grab.y;
       }
-      this.handsUI.drawPreview(hands, this.controller);
     }
 
     // Count changes, rate limited. A blocked mouth just retries next frame.
@@ -332,53 +314,6 @@ export class MeshScene implements Scene {
       const k = gh.age / POP_SECONDS;
       drawBall(g, gh.ball, this.sprites, BALL_R * (1 + 0.15 * k), 1 - k);
     }
-    g.restore();
-    if (this.handsOn) this.drawRuler(g);
-  }
-
-  /** Vertical 0-25 ruler at the right edge: the marker follows the dialling hand. */
-  private drawRuler(g: CanvasRenderingContext2D) {
-    const { width, height } = this.ctx.size;
-    const ink = cssVar('--mesh-ink') || '#1D1D1B';
-    const mesh = cssVar('--mesh-line') || '#F26A1B';
-    const x = width - 26;
-    const y0 = DIAL_TOP * height;
-    const y1 = DIAL_BOTTOM * height;
-    const { dial } = this.controller;
-    const markerY = (dial.active ? Math.min(DIAL_BOTTOM, Math.max(DIAL_TOP, dial.y)) : dialY(this.target)) * height;
-
-    g.save();
-    g.strokeStyle = ink;
-    g.fillStyle = ink;
-    g.lineWidth = 1.5;
-    g.lineCap = 'round';
-    g.globalAlpha = 0.75;
-    g.beginPath();
-    g.moveTo(x, y0);
-    g.lineTo(x, y1);
-    for (let i = 0; i <= MAX_BALLS; i++) {
-      const y = y1 - ((y1 - y0) * i) / MAX_BALLS;
-      const len = i % 5 === 0 ? 12 : 6;
-      g.moveTo(x, y);
-      g.lineTo(x - len, y);
-    }
-    g.stroke();
-    g.font = '11px ui-monospace, Menlo, monospace';
-    g.textAlign = 'right';
-    g.textBaseline = 'middle';
-    for (let i = 0; i <= MAX_BALLS; i += 5) g.fillText(String(i), x - 18, y1 - ((y1 - y0) * i) / MAX_BALLS);
-
-    g.globalAlpha = dial.active ? 1 : 0.55;
-    g.fillStyle = mesh;
-    g.beginPath();
-    g.moveTo(x + 2, markerY);
-    g.lineTo(x - 14, markerY - 8);
-    g.lineTo(x - 14, markerY + 8);
-    g.closePath();
-    g.fill();
-    g.fillStyle = ink;
-    g.font = '600 22px ui-serif, Georgia, serif';
-    g.fillText(String(this.target), x - 50, markerY);
     g.restore();
   }
 

@@ -224,12 +224,107 @@ button:focus-visible { outline: 3px solid var(--blue); outline-offset: 3px; }
   .welcome-foot-right { bottom: calc(var(--edge) + 40px); }
 }
 
-#toolbar {
-  position: absolute;
-  top: var(--top-h);
-  right: var(--edge);
+.pill.blue {
+  color: var(--bg);
+  background: var(--blue);
+  box-shadow: var(--shadow-active);
+  font-size: 32px;
 }
-#toolbar[hidden] { display: none; }
+.pill.blue:hover, .pill.round:hover { transform: translateY(-2px); }
+.pill.blue:active, .pill.round:active { transform: scale(0.96); }
+.pill.round { width: 40px; padding: 4px 0; }
+
+/* Camera preview: Figma placeholder is 473x258 in a 1280px frame (37%, aspect 880:480). */
+#preview {
+  --dur: 280ms;
+  position: absolute;
+  z-index: 15;
+  right: max(var(--edge), env(safe-area-inset-right));
+  bottom: max(var(--edge), env(safe-area-inset-bottom));
+  width: min(36.95vw, 760px);
+  aspect-ratio: 880 / 480;
+  pointer-events: none;
+}
+.preview-frame {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  background: var(--ink);
+  border-radius: clamp(12px, 1.1vw, 20px);
+  transform-origin: 100% 100%;
+  transition: transform var(--dur) ease, opacity var(--dur) ease, visibility 0s linear var(--dur);
+  pointer-events: auto;
+}
+.preview-frame canvas { width: 100%; height: 100%; display: block; }
+#preview:not([data-state='on']) .preview-frame {
+  transform: scale(0.1);
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+}
+.preview-min, .preview-fab { display: grid; place-items: center; border-radius: 50%; }
+.preview-min {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  width: 32px;
+  height: 32px;
+  color: #fff;
+  background: rgba(18, 18, 18, 0.55);
+  border: 1px solid rgba(255, 255, 255, 0.5);
+  opacity: 0.6;
+  transition: opacity 200ms, background-color 200ms;
+}
+.preview-min:hover, .preview-min:focus-visible { opacity: 1; background: rgba(18, 18, 18, 0.8); }
+.preview-fab {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  width: 56px;
+  height: 56px;
+  color: var(--bg);
+  background: var(--blue);
+  box-shadow: var(--shadow-active);
+  transform: scale(0);
+  transform-origin: 100% 100%;
+  transition: transform var(--dur) ease;
+}
+#preview[data-state='min'] .preview-fab { transform: scale(1); pointer-events: auto; }
+
+/* Bottom-left cluster: "?" then the camera button. */
+#dock {
+  position: absolute;
+  z-index: 15;
+  left: max(var(--edge), env(safe-area-inset-left));
+  bottom: max(var(--edge), env(safe-area-inset-bottom));
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+#dock[hidden] { display: none; }
+#dock-status { margin: 0; max-width: 28ch; font-size: 16px; line-height: 1.25; }
+#dock-status:empty { display: none; }
+#help-card {
+  position: absolute;
+  left: 0;
+  bottom: calc(100% + 12px);
+  width: min(340px, calc(100vw - 2 * var(--edge)));
+  padding: 14px 16px;
+  font-size: 16px;
+  line-height: 1.4;
+  background: var(--bg);
+  border-radius: 16px;
+  box-shadow: 0 6px 22px rgba(0, 0, 0, 0.25);
+}
+#help-card[hidden] { display: none; }
+#help-card p { margin: 0 0 0.5em; }
+#help-card p:last-child { margin: 0; opacity: 0.7; }
+
+@media (max-width: 640px) {
+  /* Phones: preview spans the width above the buttons, 28% of the height. */
+  #preview { width: auto; left: max(var(--edge), env(safe-area-inset-left)); aspect-ratio: auto; height: 28vh; bottom: calc(max(var(--edge), env(safe-area-inset-bottom)) + 52px); }
+  .pill.blue { font-size: 22px; }
+}
 
 .debug-panel {
   position: absolute;

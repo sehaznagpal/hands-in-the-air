@@ -34,8 +34,22 @@
 
       <div id="mock-badge" hidden>Simulated hands (?mock=1)</div>
 
-      <div id="toolbar" hidden>
-        <button id="stop" type="button">Stop camera</button>
+      <div id="preview" data-state="off">
+        <div class="preview-frame">
+          <canvas id="preview-canvas" aria-label="Camera preview with hand skeleton"></canvas>
+          <button id="preview-min" class="preview-min" type="button" aria-label="Hide camera preview"></button>
+        </div>
+        <button id="preview-fab" class="preview-fab" type="button" aria-label="Show camera preview" tabindex="-1"></button>
+      </div>
+
+      <div id="dock" hidden>
+        <div id="help-card" role="dialog" aria-label="How to use this scene" hidden>
+          <p id="help-text"></p>
+          <p>Your camera stays on your device.</p>
+        </div>
+        <button id="help-btn" class="pill round" type="button" aria-label="Help" aria-expanded="false" aria-controls="help-card">?</button>
+        <button id="cam-btn" class="pill blue" type="button">stop camera</button>
+        <p id="dock-status" role="status" aria-live="polite"></p>
       </div>
     </main>
     <script type="module" src="/src/main.ts"></script>
