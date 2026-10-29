@@ -75,3 +75,66 @@ export function buildLandmarks(pose: HandPose, aspect = 16 / 9): Landmark[] {
 export function mockHand(pose: HandPose, aspect = 16 / 9): RawHand {
   return { label: pose.label, score: 0.95, landmarks: buildLandmarks(pose, aspect) };
 }
+
+const smooth = (t: number) => {
+  const c = Math.min(1, Math.max(0, t));
+  return c * c * (3 - 2 * c);
+};
+const ramp = (t: number, a: number, b: number) => smooth((t - a) / (b - a));
+
+/**
+ * Two scripted hands for testing without a camera (?mock=1).
+ * Right hand: stays open and slides up and down (the dial), with an occasional swipe.
+ * Left hand: rests with a pinch, then makes a fist, wanders around, and opens again.
+ */
+export class MockHands {
+  private t0 = -1;
+  private readonly scale = 0.22;
+  /** Wrist sits this far below the palm centre. */
+  private readonly palmDrop = 0.73 * this.scale;
+
+  sample(nowSeconds: number, aspect = 16 / 9): RawHand[] {
+    if (this.t0 < 0) this.t0 = nowSeconds;
+    const t = nowSeconds - this.t0;
+    return [this.right(t, aspect), this.left(t, aspect)];
+  }
+
+  private right(t: number, aspect: number): RawHand {
+    const palmY = 0.5 + 0.37 * Math.cos((2 * Math.PI * t) / 30);
+    const tau = t % 20;
+    const swipe = -0.4 * ramp(tau, 18, 18.18) + 0.4 * ramp(tau, 18.4, 19.9);
+    return mockHand(
+      {
+        label: 'Right',
+        x: 0.72 + 0.04 * Math.sin(0.5 * t) + swipe,
+        y: palmY + this.palmDrop,
+        scale: this.scale,
+        curl: [0, 0, 0, 0, 0],
+        pinch: 0,
+        rotation: 0.06 * Math.sin(0.7 * t),
+      },
+      aspect,
+    );
+  }
+
+  private left(t: number, aspect: number): RawHand {
+    const c = t % 14;
+    const fist = ramp(c, 4, 4.6) * (1 - ramp(c, 10, 10.6));
+    const wander = ramp(c, 4.6, 5.5) * (1 - ramp(c, 9.4, 10));
+    const pinch = ramp(c, 1.2, 1.7) * (1 - ramp(c, 2.6, 3.1));
+    const palmX = 0.28 + wander * (0.14 + 0.14 * Math.sin(1.1 * (c - 4.6)));
+    const palmY = 0.62 - wander * (0.28 + 0.1 * Math.sin(0.9 * (c - 4.6)));
+    return mockHand(
+      {
+        label: 'Left',
+        x: palmX,
+        y: palmY + this.palmDrop,
+        scale: this.scale,
+        curl: [fist, fist, fist, fist, fist],
+        pinch,
+        rotation: -0.05 * Math.sin(0.6 * t),
+      },
+      aspect,
+    );
+  }
+}

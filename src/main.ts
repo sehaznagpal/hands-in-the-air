@@ -1,6 +1,7 @@
 import { CameraError, startCamera, type Camera } from './camera';
 import { DebugOverlay } from './debug';
 import { HandSignals } from './hands';
+import { MockHands } from './mock';
 import type { Host, Scene, SceneContext } from './scene';
 import { scenes } from './scenes';
 import { createTracker, ModelError, type HandTracker } from './tracker';
@@ -16,6 +17,7 @@ const toolbar = $('toolbar');
 const message = $('message');
 const overlay = $('overlay');
 const app = $('app');
+const badge = $('mock-badge');
 const g = canvas.getContext('2d')!;
 const debug = new DebugOverlay(app);
 const params = new URLSearchParams(location.search);
@@ -48,6 +50,10 @@ let tracking = false;
 let starting = false;
 let lastVideoTime = -1;
 let detectMs = 0;
+let detectErrors = 0;
+const mockHands = new MockHands();
+const MOCK_FRAME = 1 / 30;
+let lastMockT = -1;
 const trackingListeners = new Set<(on: boolean) => void>();
 
 const aspect = () => (video.videoWidth && video.videoHeight ? video.videoWidth / video.videoHeight : 16 / 9);
@@ -61,10 +67,15 @@ const host: Host = {
     return aspect();
   },
   get hasVideo() {
-    return tracking && video.readyState >= 2;
+    return tracking && !host.mock && video.readyState >= 2;
   },
   async startTracking() {
     if (tracking || starting) return null;
+    if (host.mock) {
+      lastMockT = -1;
+      setTracking(true);
+      return null;
+    }
     starting = true;
     try {
       camera = await startCamera(video);
@@ -79,6 +90,11 @@ const host: Host = {
       starting = false;
     }
     lastVideoTime = -1;
+    detectErrors = 0;
+    camera.stream.getVideoTracks()[0]?.addEventListener('ended', () => {
+      host.stopTracking();
+      message.textContent = 'The camera was disconnected. Press Start camera to try again.';
+    });
     setTracking(true);
     return null;
   },
@@ -126,16 +142,20 @@ function setScene(index: number) {
   overlay.replaceChildren();
   sceneIndex = index;
   scene = scenes[index].create();
+  // A scene with its own camera switch starts with tracking off.
+  if (scene.ownsCameraUI && tracking) host.stopTracking();
   scene.init(sceneCtx);
   menu.value = scenes[index].id;
   syncChrome();
+  if (host.mock && !scene.ownsCameraUI && !tracking) void host.startTracking();
 }
 
 /** Start button and toolbar show only for scenes without their own camera switch. */
 function syncChrome() {
   const own = scene?.ownsCameraUI ?? false;
   intro.hidden = tracking || own || host.mock;
-  toolbar.hidden = !tracking || own;
+  toolbar.hidden = !tracking || own || host.mock;
+  badge.hidden = !host.mock;
 }
 
 // Hidden dev menu: press ` to show.
@@ -167,8 +187,20 @@ function frame(now: number) {
   if (tracker && video.readyState >= 2 && video.currentTime !== lastVideoTime) {
     lastVideoTime = video.currentTime;
     const t0 = performance.now();
-    detected = tracker.detect(video, t0);
+    try {
+      detected = tracker.detect(video, t0);
+      detectErrors = 0;
+    } catch (err) {
+      console.warn('hand detection failed', err);
+      if (++detectErrors > 30) {
+        host.stopTracking();
+        message.textContent = 'Hand tracking stopped working. Press Start camera to try again.';
+      }
+    }
     detectMs += (performance.now() - t0 - detectMs) * 0.1;
+  } else if (host.mock && tracking && now / 1000 - lastMockT >= MOCK_FRAME) {
+    lastMockT = now / 1000;
+    detected = mockHands.sample(now / 1000);
   }
   signals.update(detected, now / 1000, aspect());
 
@@ -219,6 +251,7 @@ startBtn.addEventListener('click', async () => {
   startBtn.disabled = false;
 });
 stopBtn.addEventListener('click', () => host.stopTracking());
+window.addEventListener('pagehide', () => host.stopTracking());
 
 const wanted = scenes.findIndex((s) => s.id === params.get('scene'));
 setScene(wanted >= 0 ? wanted : 0);

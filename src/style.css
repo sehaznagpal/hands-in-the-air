@@ -116,3 +116,18 @@ button:focus-visible { outline: 3px solid var(--accent); outline-offset: 3px; }
   border-radius: 8px;
 }
 .dev-menu[hidden] { display: none; }
+
+#mock-badge {
+  position: absolute;
+  top: max(12px, env(safe-area-inset-top));
+  left: 50%;
+  transform: translateX(-50%);
+  padding: 0.25em 0.8em;
+  font: 12px var(--mono);
+  color: var(--paper);
+  background: var(--ink);
+  border-radius: 999px;
+  opacity: 0.75;
+  pointer-events: none;
+}
+#mock-badge[hidden] { display: none; }
