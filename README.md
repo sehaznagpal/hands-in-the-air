@@ -89,7 +89,7 @@ with simulated hands).
 | `ArrowUp` / `+` / mouse wheel up / **+** button | Add a ball |
 | `ArrowDown` / `-` / mouse wheel down / **−** button | Remove a ball |
 | `M` or the marbles / fruit toggle | Switch ball set |
-| `?` button (hover or click) | Help card; `Esc` or a click outside closes it |
+| `?` button (hover or click) | Animated help card (looping hand-skeleton guides in `src/guide/`); it opens by itself the first time each scene is shown (15 s), `Esc`, the x or a click outside closes it. `?guide=1` shows the guides and the pose sheet |
 
 **Hands** (whenever the camera is on)
 
