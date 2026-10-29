@@ -272,7 +272,8 @@ export function getSprites(set: BallSet): BallSprite[] {
 
 /** Sprite for a ball id; ids are shuffled so neighbours rarely match. */
 export function spriteFor(sprites: BallSprite[], id: number): BallSprite {
-  return sprites[(id * 5 + 1) % sprites.length];
+  const step = sprites.length % 5 === 0 ? 3 : 5; // coprime with the sprite count
+  return sprites[(id * step + 1) % sprites.length];
 }
 
 export const SPRITE_PAD = R / C;

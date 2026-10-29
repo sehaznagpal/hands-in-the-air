@@ -74,6 +74,41 @@ thumb to pinky.
 a slow vertical slide and an occasional swipe) running through the same signal
 pipeline. Use it for testing and as a fallback demo.
 
+## Scene: net bag
+
+A hanging orange mesh bag that holds 0 to 25 balls. The bag lengthens and bulges to
+match the count, swings from its hook like a pendulum, and the balls slosh inside.
+Open it with key `2`, the dev menu, or `/?scene=net-bag` (add `&mock=1` to drive it
+with simulated hands).
+
+**Mouse, touch and keyboard (always on)**
+
+| Input | Action |
+| --- | --- |
+| Drag the hanger or the top of the bag | Move the hook; the bag swings |
+| `ArrowUp` / `+` / mouse wheel up / **+** button | Add a ball |
+| `ArrowDown` / `-` / mouse wheel down / **−** button | Remove a ball |
+| `M` or the marbles / fruit toggle | Switch ball set |
+| `?` button (hover or click) | Help card; `Esc` or a click outside closes it |
+
+**Hands** (top right toggle, off by default; it asks for the camera and shows
+"Your camera stays on your device")
+
+| Gesture | Action |
+| --- | --- |
+| Open hand, raise or lower | Dial: palm height sets the count (top of the ruler 25, bottom 0). Snaps with hysteresis. If both hands are open the right one wins. Closing the hand locks the value; losing the hand holds it |
+| Fist (openness below 0.25 for 120 ms), either hand | Grab: the hook follows the fist. Opening the hand (above 0.5) releases; the hook stays where it is |
+| Fast open-hand swipe left or right | Gust of wind |
+
+A ruler at the right edge shows the dial, and a mirrored camera preview (bottom
+right, hide button included) shows the skeleton and fingertips.
+
+**Tuning.** Colours are CSS variables (`--nb-paper`, `--nb-net`, `--nb-ink`) in
+`src/style.css`. Physics numbers live in `TUNING` in `src/scenes/netbag/physics.ts`;
+`RELEASE_MODE` in `src/scenes/netbag/index.ts` switches between the hook staying put
+and springing back to the top centre. The physics is plain Verlet (no library) and is
+unit-tested headless: `npm test`.
+
 ## Notes
 
 - Detection runs once per new video frame inside `requestAnimationFrame`, pauses
