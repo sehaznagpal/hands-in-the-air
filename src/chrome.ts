@@ -1,6 +1,6 @@
 import type { HandSignals } from './hands';
 import type { Host } from './scene';
-import { FINGERTIP_INDEX, HAND_CONNECTIONS } from './types';
+import { drawSkeleton } from './skeleton';
 import { coverRect } from './view';
 
 const HELP_AUTO_MS = 6000;
@@ -201,29 +201,12 @@ export class Chrome {
       g.fillText('simulated hands', 14, h - 14);
     }
 
-    g.lineCap = 'round';
     for (const hand of signals.hands) {
-      const p = hand.landmarks.map((l) => ({ x: r.x + l.x * r.w, y: r.y + l.y * r.h }));
-      g.strokeStyle = 'rgba(255,255,255,0.85)';
-      g.lineWidth = 2;
-      g.beginPath();
-      for (const [a, b] of HAND_CONNECTIONS) {
-        g.moveTo(p[a].x, p[a].y);
-        g.lineTo(p[b].x, p[b].y);
-      }
-      g.stroke();
-      g.fillStyle = '#fff';
-      for (const pt of p) {
-        g.beginPath();
-        g.arc(pt.x, pt.y, 2, 0, Math.PI * 2);
-        g.fill();
-      }
-      g.fillStyle = orange;
-      for (const li of FINGERTIP_INDEX) {
-        g.beginPath();
-        g.arc(p[li].x, p[li].y, 5, 0, Math.PI * 2);
-        g.fill();
-      }
+      drawSkeleton(
+        g,
+        hand.landmarks.map((l) => ({ x: r.x + l.x * r.w, y: r.y + l.y * r.h })),
+        orange,
+      );
     }
   }
 }
