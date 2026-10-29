@@ -5,6 +5,7 @@ import { DialDriver, HandController, smoothToward } from './handcontrol';
 import { BagWorld, MAX_BALLS, BALL_R, type Ball } from './physics';
 import { drawBall, drawMesh } from './render';
 import { TUNING } from './tuning';
+import { MarbleRenderer } from './marbles';
 import { getSprites, type BallSet } from './sprites';
 
 /** What happens to the hook when released. 'stay' keeps it; 'home' springs back to the top centre. */
@@ -47,7 +48,8 @@ export class MeshScene implements Scene {
   private world = new BagWorld();
   private ghosts: Ghost[] = [];
   private set: BallSet = 'marbles';
-  private sprites = getSprites('marbles');
+  private sprites = getSprites('fruit');
+  private marbles = new MarbleRenderer();
 
   /** Wanted ball count, and the time until the next change is allowed. */
   private target = 0;
@@ -154,7 +156,7 @@ export class MeshScene implements Scene {
 
   private chooseSet(set: BallSet) {
     this.set = set;
-    this.sprites = getSprites(set);
+    if (set === 'fruit') this.sprites = getSprites(set);
     this.refreshUI();
   }
 
@@ -297,6 +299,7 @@ export class MeshScene implements Scene {
   update(hands: HandSignals, dt: number) {
     const { width, height } = this.ctx.size;
     const world = this.world;
+    this.marbles.tick(dt);
 
     if (this.handsOn) {
       this.controller.update(hands, dt);
@@ -368,11 +371,19 @@ export class MeshScene implements Scene {
 
     g.save();
     g.setTransform(dpr * this.scale, 0, 0, dpr * this.scale, dpr * this.offset.x, dpr * this.offset.y);
-    for (const b of this.world.balls) drawBall(g, b, this.sprites, BALL_R * b.scale);
+    const marbles = this.set === 'marbles';
+    const d = this.marbles.sizeFor(BALL_R * this.scale, dpr);
+    const now = performance.now() / 1000;
+    for (const b of this.world.balls) {
+      if (marbles) this.marbles.draw(g, b, BALL_R * b.scale, 1, d);
+      else drawBall(g, b, this.sprites, BALL_R * b.scale);
+    }
+    if (marbles) this.marbles.sparkles(g, this.world.balls, BALL_R, now);
     drawMesh(g, this.world, cssVar('--orange') || '#c54812', 3 / this.scale);
     for (const gh of this.ghosts) {
       const k = gh.age / POP_SECONDS;
-      drawBall(g, gh.ball, this.sprites, BALL_R * (1 + 0.15 * k), 1 - k);
+      if (marbles) this.marbles.draw(g, gh.ball, BALL_R * (1 + 0.15 * k), 1 - k, d);
+      else drawBall(g, gh.ball, this.sprites, BALL_R * (1 + 0.15 * k), 1 - k);
     }
     g.restore();
   }

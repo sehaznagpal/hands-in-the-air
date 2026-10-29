@@ -19,100 +19,6 @@ function canvas(): [HTMLCanvasElement, CanvasRenderingContext2D] {
   return [c, c.getContext('2d')!];
 }
 
-interface Marble {
-  base: string;
-  a: string;
-  b: string;
-  /** angle, offset, width, amplitude, frequency, phase for three ribbons */
-  ribbons: [number, number, number, number, number, number][];
-}
-
-const MARBLES: Marble[] = [
-  { base: '#F3EEDF', a: '#2E5BD8', b: '#9DB6F2', ribbons: [[0.5, 0.05, 0.3, 0.18, 2.4, 0.3], [0.62, 0.45, 0.14, 0.14, 2.8, 1.4], [0.4, -0.5, 0.18, 0.12, 2.2, 2.6]] },
-  { base: '#F6EEDD', a: '#F0553A', b: '#F2B63A', ribbons: [[-0.5, 0, 0.34, 0.2, 2.0, 0.9], [-0.35, 0.5, 0.16, 0.16, 2.6, 2.1], [-0.65, -0.45, 0.14, 0.12, 2.4, 0.2]] },
-  { base: '#EEF3E6', a: '#1FA37A', b: '#8AD9B8', ribbons: [[1.1, -0.1, 0.3, 0.2, 1.8, 0.5], [0.9, 0.4, 0.16, 0.14, 2.6, 1.9], [1.25, -0.55, 0.12, 0.12, 2.2, 3.1]] },
-  { base: '#F5ECE6', a: '#7B4BD1', b: '#F4A27E', ribbons: [[0.1, 0.1, 0.32, 0.22, 2.2, 1.7], [0.25, -0.45, 0.15, 0.13, 2.9, 0.4], [-0.05, 0.55, 0.13, 0.12, 2.3, 2.8]] },
-  { base: '#F7EAEA', a: '#D6336C', b: '#F59AB5', ribbons: [[-1.0, 0, 0.3, 0.18, 2.1, 2.2], [-0.8, 0.45, 0.16, 0.15, 2.7, 0.7], [-1.15, -0.5, 0.14, 0.12, 2.4, 1.5]] },
-  { base: '#EAF4F5', a: '#2AA9D9', b: '#B7D93A', ribbons: [[0.8, 0.05, 0.3, 0.2, 2.3, 0.1], [0.6, -0.45, 0.17, 0.14, 2.5, 2.4], [0.95, 0.5, 0.13, 0.12, 2.1, 1.2]] },
-];
-
-function ribbon(g: CanvasRenderingContext2D, [ang, off, width, amp, freq, phase]: Marble['ribbons'][number], color: string) {
-  const ca = Math.cos(ang);
-  const sa = Math.sin(ang);
-  const path = () => {
-    g.beginPath();
-    for (let u = -1.4; u <= 1.4; u += 0.08) {
-      const v = (off + amp * Math.sin(u * freq + phase)) * R;
-      const x = C + ca * u * R - sa * v;
-      const y = C + sa * u * R + ca * v;
-      if (u === -1.4) g.moveTo(x, y);
-      else g.lineTo(x, y);
-    }
-  };
-  g.strokeStyle = color;
-  g.lineCap = 'round';
-  g.lineJoin = 'round';
-  // A wide faint pass first softens the edge.
-  g.globalAlpha = 0.28;
-  g.lineWidth = width * R * 1.5;
-  path();
-  g.stroke();
-  g.globalAlpha = 0.95;
-  g.lineWidth = width * R;
-  path();
-  g.stroke();
-  g.globalAlpha = 1;
-}
-
-function marbleBody(m: Marble) {
-  const [c, g] = canvas();
-  g.beginPath();
-  g.arc(C, C, R, 0, Math.PI * 2);
-  g.clip();
-  const base = g.createRadialGradient(C * 0.8, C * 0.75, R * 0.1, C, C, R);
-  base.addColorStop(0, '#ffffff');
-  base.addColorStop(0.55, m.base);
-  base.addColorStop(1, m.base);
-  g.fillStyle = base;
-  g.fillRect(0, 0, S, S);
-  ribbon(g, m.ribbons[0], m.a);
-  ribbon(g, m.ribbons[1], m.b);
-  ribbon(g, m.ribbons[2], m.a);
-  return c;
-}
-
-function glassShine() {
-  const [c, g] = canvas();
-  // Milky depth: lighter in the middle, darker toward the rim.
-  const rim = g.createRadialGradient(C, C, R * 0.55, C, C, R);
-  rim.addColorStop(0, 'rgba(255,255,255,0.10)');
-  rim.addColorStop(0.8, 'rgba(40,30,20,0.06)');
-  rim.addColorStop(1, 'rgba(40,30,20,0.28)');
-  g.fillStyle = rim;
-  g.beginPath();
-  g.arc(C, C, R, 0, Math.PI * 2);
-  g.fill();
-  // Soft highlight.
-  g.save();
-  g.translate(C * 0.68, C * 0.6);
-  g.rotate(-0.7);
-  const hl = g.createRadialGradient(0, 0, 0, 0, 0, R * 0.42);
-  hl.addColorStop(0, 'rgba(255,255,255,0.85)');
-  hl.addColorStop(1, 'rgba(255,255,255,0)');
-  g.scale(1, 0.62);
-  g.fillStyle = hl;
-  g.beginPath();
-  g.arc(0, 0, R * 0.42, 0, Math.PI * 2);
-  g.fill();
-  g.restore();
-  // Faint bounce light low on the right.
-  g.fillStyle = 'rgba(255,255,255,0.22)';
-  g.beginPath();
-  g.ellipse(C * 1.35, C * 1.5, R * 0.18, R * 0.07, -0.6, 0, Math.PI * 2);
-  g.fill();
-  return c;
-}
-
 // -------------------------------------------------------------------- fruit
 
 type Paint = (g: CanvasRenderingContext2D) => void;
@@ -263,8 +169,9 @@ const cache = new Map<BallSet, BallSprite[]>();
 export function getSprites(set: BallSet): BallSprite[] {
   let sprites = cache.get(set);
   if (!sprites) {
-    const shine = set === 'marbles' ? glassShine() : flatShine();
-    sprites = (set === 'marbles' ? MARBLES.map(marbleBody) : FRUITS.map(fruitBody)).map((body) => ({ body, shine }));
+    // Marbles are drawn by marbles.ts; this table only holds the fruit.
+    const shine = flatShine();
+    sprites = FRUITS.map(fruitBody).map((body) => ({ body, shine }));
     cache.set(set, sprites);
   }
   return sprites;
