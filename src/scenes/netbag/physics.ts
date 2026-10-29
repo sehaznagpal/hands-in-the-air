@@ -51,12 +51,15 @@ export const TUNING = {
   lengthK: 0.02,
   maxStretch: 1.6,
   wallDamp: 0.997,
+  /** Largest wall particle move per substep (units). */
+  wallMaxMove: 0.25,
   ballDamp: 0.9995,
   ballMass: 3,
   /** Extra velocity damping per substep for balls in contact (rolling resistance). */
   contactDamp: 0.985,
   hookOmega: 16,
-  hookMaxSpeed: 90,
+  hookMaxSpeed: 40,
+  hookMaxAccel: 140,
   /** Speed below which (units/s) the bag may sleep. */
   sleepSpeed: 0.4,
   sleepAfter: 0.6,
@@ -90,6 +93,7 @@ export class BagWorld {
   balls: Ball[] = [];
   hook = { x: 0, y: 0 };
   hookTarget = { x: 0, y: 0 };
+  private hookVel = { x: 0, y: 0 };
   sleeping = false;
   private nextId = 0;
   private acc = 0;
@@ -241,19 +245,27 @@ export class BagWorld {
   }
 
   private moveHook(h: number) {
-    const dx = this.hookTarget.x - this.hook.x;
-    const dy = this.hookTarget.y - this.hook.y;
-    const k = 1 - Math.exp(-h * TUNING.hookOmega);
-    let sx = dx * k;
-    let sy = dy * k;
-    const len = Math.hypot(sx, sy);
-    const max = TUNING.hookMaxSpeed * h;
-    if (len > max) {
-      sx *= max / len;
-      sy *= max / len;
+    const T = TUNING;
+    // Velocity-limited, acceleration-limited follow: a hand can jerk, the bag only feels a firm tug.
+    let wx = (this.hookTarget.x - this.hook.x) * T.hookOmega;
+    let wy = (this.hookTarget.y - this.hook.y) * T.hookOmega;
+    const wl = Math.hypot(wx, wy);
+    if (wl > T.hookMaxSpeed) {
+      wx *= T.hookMaxSpeed / wl;
+      wy *= T.hookMaxSpeed / wl;
     }
-    this.hook.x += sx;
-    this.hook.y += sy;
+    let ax = wx - this.hookVel.x;
+    let ay = wy - this.hookVel.y;
+    const al = Math.hypot(ax, ay);
+    const maxA = T.hookMaxAccel * h;
+    if (al > maxA) {
+      ax *= maxA / al;
+      ay *= maxA / al;
+    }
+    this.hookVel.x += ax;
+    this.hookVel.y += ay;
+    this.hook.x += this.hookVel.x * h;
+    this.hook.y += this.hookVel.y * h;
   }
 
   private step() {
@@ -263,8 +275,14 @@ export class BagWorld {
 
     for (const p of this.walls) {
       if (!p.inv) continue;
-      const vx = (p.x - p.px) * TUNING.wallDamp;
-      const vy = (p.y - p.py) * TUNING.wallDamp;
+      let vx = (p.x - p.px) * TUNING.wallDamp;
+      let vy = (p.y - p.py) * TUNING.wallDamp;
+      // A whipped hook must not be able to fling the net into a tangle.
+      const sp = Math.hypot(vx, vy);
+      if (sp > TUNING.wallMaxMove) {
+        vx *= TUNING.wallMaxMove / sp;
+        vy *= TUNING.wallMaxMove / sp;
+      }
       p.px = p.x;
       p.py = p.y;
       p.x += vx;
@@ -387,6 +405,11 @@ export class BagWorld {
         this.pull(a, b, seg * T.maxStretch, 1);
         this.push(a, b, seg * 0.5, 1);
       }
+      // Bending limit: the chain may curve but never fold back on itself.
+      if (i < LEVELS - 2) {
+        const seg2 = (i + 1 < NECK_SEGS ? NECK_SEG : body);
+        for (const chain of [left, right]) this.push(chain[i], chain[i + 2], (seg + seg2) * 0.75, 0.6);
+      }
       // Diagonals: a loose rope that keeps the lattice from shearing too far.
       const wAvg = (T.widthHard * (PROFILE[i] + PROFILE[i + 1])) / 2;
       const diag = Math.hypot(wAvg, seg * 1.3);
@@ -396,6 +419,7 @@ export class BagWorld {
     for (let i = 1; i < LEVELS; i++) {
       const a = left[i];
       const b = right[i];
+      this.keepUntwisted(i);
       const rest = T.widthRest * PROFILE[i];
       const hard = T.widthHard * PROFILE[i];
       const limp = i === LEVELS - 1 ? 1.1 : T.widthLimp;
@@ -411,6 +435,29 @@ export class BagWorld {
       this.pull(a, b, hard, 1);
       this.push(a, b, Math.min(0.5, rest * 0.5), 1);
     }
+  }
+
+  /** The right edge must stay on the right of travel: stops the bag twisting or turning inside out. */
+  private keepUntwisted(i: number) {
+    const { left, right } = this;
+    const lo = Math.max(0, i - 1);
+    const hi = Math.min(LEVELS - 1, i + 1);
+    const tx = left[hi].x - left[lo].x + right[hi].x - right[lo].x;
+    const ty = left[hi].y - left[lo].y + right[hi].y - right[lo].y;
+    const tl = Math.hypot(tx, ty);
+    if (tl < 1e-6) return;
+    const nx = ty / tl;
+    const ny = -tx / tl;
+    const a = left[i];
+    const b = right[i];
+    const s = (b.x - a.x) * nx + (b.y - a.y) * ny;
+    const min = 0.35;
+    if (s >= min) return;
+    const c = (min - s) * 0.5;
+    a.x -= nx * c * a.inv;
+    a.y -= ny * c * a.inv;
+    b.x += nx * c * b.inv;
+    b.y += ny * c * b.inv;
   }
 
   private collideBalls() {
