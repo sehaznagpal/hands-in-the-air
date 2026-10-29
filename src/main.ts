@@ -1,7 +1,7 @@
 import { CameraError, startCamera, type Camera } from './camera';
 import { DebugOverlay } from './debug';
 import { createTracker, ModelError, type HandTracker } from './tracker';
-import type { RawHand } from './types';
+import { HandSignals } from './hands';
 import { coverRect } from './view';
 
 const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
@@ -35,7 +35,11 @@ let tracker: HandTracker | null = null;
 let running = false;
 let rafId = 0;
 let lastVideoTime = -1;
-let hands: RawHand[] = [];
+const signals = new HandSignals();
+signals.on('pinchStart', (e) => debug.note(`${e.hand} pinchStart`));
+signals.on('pinchEnd', (e) => debug.note(`${e.hand} pinchEnd`));
+signals.on('fingerCount', (e) => debug.note(`${e.hand} fingers ${e.count}`));
+signals.on('swipe', (e) => debug.note(`${e.hand} swipe ${e.direction} ${e.speed.toFixed(1)}`));
 let detectMs = 0;
 let fps = 60;
 let lastFrame = 0;
@@ -79,7 +83,7 @@ function stop() {
   camera = null;
   tracker?.close();
   tracker = null;
-  hands = [];
+  signals.update([], performance.now() / 1000 + 1);
   intro.hidden = false;
   toolbar.hidden = true;
 }
@@ -90,19 +94,21 @@ function frame(now: number) {
   fps += (1000 / Math.max(1, now - lastFrame) - fps) * 0.1;
   lastFrame = now;
 
-  // Detect once per new video frame.
+  // Detect once per new video frame; other frames just age the presence timers.
+  const aspect = video.videoWidth && video.videoHeight ? video.videoWidth / video.videoHeight : 16 / 9;
+  let detected: ReturnType<HandTracker['detect']> | null = null;
   if (tracker && video.readyState >= 2 && video.currentTime !== lastVideoTime) {
     lastVideoTime = video.currentTime;
     const t0 = performance.now();
-    hands = tracker.detect(video, t0);
+    detected = tracker.detect(video, t0);
     detectMs += (performance.now() - t0 - detectMs) * 0.1;
   }
+  signals.update(detected, now / 1000, aspect);
 
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
   ctx.fillStyle = getComputedStyle(document.documentElement).getPropertyValue('--paper');
   ctx.fillRect(0, 0, width, height);
 
-  const aspect = video.videoWidth && video.videoHeight ? video.videoWidth / video.videoHeight : 16 / 9;
   const rect = coverRect(width, height, aspect);
   if (video.readyState >= 2) {
     ctx.save();
@@ -112,7 +118,7 @@ function frame(now: number) {
     ctx.drawImage(video, 0, 0, rect.w, rect.h);
     ctx.restore();
   }
-  debug.draw(ctx, rect, hands, { fps, detectMs, delegate: tracker?.delegate ?? '-' });
+  debug.draw(ctx, rect, signals, { fps, detectMs, delegate: tracker?.delegate ?? '-' });
 }
 
 // Pause when the tab is hidden; resume without a dt spike.

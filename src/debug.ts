@@ -1,4 +1,5 @@
-import { FINGERTIP_INDEX, HAND_CONNECTIONS, type RawHand } from './types';
+import type { HandSignals, HandState } from './hands';
+import { HAND_CONNECTIONS } from './types';
 import type { Rect } from './view';
 
 export interface Stats {
@@ -10,6 +11,7 @@ export interface Stats {
 export class DebugOverlay {
   visible = false;
   private panel: HTMLElement;
+  private log: string[] = [];
 
   constructor(parent: HTMLElement) {
     this.panel = document.createElement('pre');
@@ -18,12 +20,18 @@ export class DebugOverlay {
     parent.appendChild(this.panel);
   }
 
+  /** Keeps the last few events for the panel. */
+  note(text: string) {
+    this.log.push(text);
+    if (this.log.length > 6) this.log.shift();
+  }
+
   toggle() {
     this.visible = !this.visible;
     this.panel.hidden = !this.visible;
   }
 
-  draw(ctx: CanvasRenderingContext2D, rect: Rect, hands: RawHand[], stats: Stats) {
+  draw(ctx: CanvasRenderingContext2D, rect: Rect, signals: HandSignals, stats: Stats) {
     if (!this.visible) return;
     const css = getComputedStyle(document.documentElement);
     const accent = css.getPropertyValue('--accent').trim() || '#d2452b';
@@ -35,7 +43,8 @@ export class DebugOverlay {
     ctx.font = '600 13px ui-monospace, Menlo, monospace';
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
-    hands.forEach((hand, hi) => {
+    const hands = signals.hands;
+    hands.forEach((hand) => {
       const pts = hand.landmarks.map((p) => ({ x: rect.x + p.x * rect.w, y: rect.y + p.y * rect.h }));
       ctx.strokeStyle = ink;
       ctx.beginPath();
@@ -50,9 +59,9 @@ export class DebugOverlay {
         ctx.arc(p.x, p.y, 3, 0, Math.PI * 2);
         ctx.fill();
       }
-      FINGERTIP_INDEX.forEach((li, fi) => {
-        const p = pts[li];
-        const id = (hand.label === 'Left' ? 0 : 5) + fi + 1;
+      hand.fingertips.forEach((tip) => {
+        const p = { x: rect.x + tip.x * rect.w, y: rect.y + tip.y * rect.h };
+        const id = tip.id;
         ctx.fillStyle = accent;
         ctx.beginPath();
         ctx.arc(p.x, p.y, 11, 0, Math.PI * 2);
@@ -60,16 +69,31 @@ export class DebugOverlay {
         ctx.fillStyle = '#fff';
         ctx.fillText(String(id), p.x, p.y + 1);
       });
-      void hi;
     });
     ctx.restore();
 
     const lines = [
-      `fps        ${stats.fps.toFixed(0)}`,
-      `detect     ${stats.detectMs.toFixed(1)} ms (${stats.delegate})`,
-      `hands      ${hands.length}`,
-      ...hands.map((h) => `${h.label.padEnd(5)} score ${h.score.toFixed(2)}`),
+      `fps     ${stats.fps.toFixed(0)}`,
+      `detect  ${stats.detectMs.toFixed(1)} ms (${stats.delegate})`,
+      `hands   ${hands.length}`,
+      ...hands.flatMap(describe),
+      ...(this.log.length ? ['', 'events', ...this.log] : []),
     ];
     this.panel.textContent = lines.join('\n');
   }
+}
+
+const f2 = (n: number) => n.toFixed(2).padStart(5);
+
+function describe(h: HandState): string[] {
+  const ext = Object.entries(h.extended)
+    .map(([k, v]) => (v ? k[0].toUpperCase() : '-'))
+    .join('');
+  return [
+    '',
+    `${h.label} hand  fingers ${h.fingerCount} [${ext}]`,
+    `  open ${f2(h.openness)}  pinch ${f2(h.pinchDistance)} ${h.pinching ? 'ON' : 'off'}`,
+    `  palm ${f2(h.palm.x)},${f2(h.palm.y)}  scale ${f2(h.scale)}`,
+    `  vel  ${f2(h.velocity.x)},${f2(h.velocity.y)}`,
+  ];
 }
