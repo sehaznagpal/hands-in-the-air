@@ -1,5 +1,5 @@
 /**
- * Net bag physics: Verlet particles, distance constraints, circle balls.
+ * Mesh bag physics: Verlet particles, distance constraints, circle balls.
  * Pure TypeScript, no DOM, so it can be tested headless. Units: ball radius = 1.
  */
 
@@ -36,11 +36,11 @@ export const TUNING = {
   widthRest: 4.4,
   /** Hard cap on width, 3 ball diameters. */
   widthHard: 6,
-  /** Width the empty, limp net settles toward. */
+  /** Width the empty, limp mesh settles toward. */
   widthLimp: 0.55,
   /**
    * Soft constraint stiffness per iteration. Effective spring constant is k * iterations / step^2,
-   * so these must be small for a ball's weight to be able to move the net.
+   * so these must be small for a ball's weight to be able to move the mesh.
    */
   stretchK: 0.2,
   widthK: 0.004,
@@ -203,7 +203,7 @@ export class BagWorld {
     return m / TUNING.step;
   }
 
-  /** Lowest point of the bag (net or ball), in world units. */
+  /** Lowest point of the bag (mesh or ball), in world units. */
   bottom(): number {
     let y = 0;
     for (const p of this.walls) y = Math.max(y, p.y);
@@ -263,7 +263,7 @@ export class BagWorld {
       ax *= maxA / al;
       ay *= maxA / al;
     }
-    // Speeding up downward slower than gravity keeps the net taut, so the pile never crashes into the neck.
+    // Speeding up downward slower than gravity keeps the mesh taut, so the pile never crashes into the neck.
     ay = Math.min(ay, T.hookMaxDownAccel * h);
     this.hookVel.x += ax;
     this.hookVel.y += ay;
@@ -280,7 +280,7 @@ export class BagWorld {
       if (!p.inv) continue;
       let vx = (p.x - p.px) * TUNING.wallDamp;
       let vy = (p.y - p.py) * TUNING.wallDamp;
-      // A whipped hook must not be able to fling the net into a tangle.
+      // A whipped hook must not be able to fling the mesh into a tangle.
       const sp = Math.hypot(vx, vy);
       if (sp > TUNING.wallMaxMove) {
         vx *= TUNING.wallMaxMove / sp;
@@ -396,7 +396,7 @@ export class BagWorld {
     const { left, right } = this;
     const n = this.balls.length;
     const over = Math.min(1, Math.max(0, (n - 10) / 15));
-    // The net lengthens with its load: a gentle spring on the segment length.
+    // The mesh lengthens with its load: a gentle spring on the segment length.
     const body = bodySeg(n, this.boost);
     for (let i = 0; i < LEVELS - 1; i++) {
       const seg = i < NECK_SEGS ? NECK_SEG : body;
@@ -427,7 +427,7 @@ export class BagWorld {
       const hard = T.widthHard * PROFILE[i];
       const limp = i === LEVELS - 1 ? 1.1 : T.widthLimp;
       this.pull(a, b, limp, T.limpK);
-      // The net opens around what it holds: a spring toward the full width where balls are.
+      // The mesh opens around what it holds: a spring toward the full width where balls are.
       const occ = this.occupancy[i];
       if (occ > 0.01) {
         const target = limp + (rest * (1 + 0.25 * over) - limp) * occ;

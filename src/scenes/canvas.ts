@@ -10,7 +10,8 @@ interface TrailPoint {
 const TRAIL_SECONDS = 0.45;
 
 /** Ten dots, one per fingertip, with fading trails. Handy to verify tracking. */
-export class DotsScene implements Scene {
+export class CanvasScene implements Scene {
+  readonly help = 'Move your hands in front of the camera. Every fingertip draws a trail.';
   private ctx!: SceneContext;
   private trails = new Map<number, TrailPoint[]>();
   private tips: { id: number; x: number; y: number; hand: string }[] = [];
@@ -37,7 +38,7 @@ export class DotsScene implements Scene {
   draw(g: CanvasRenderingContext2D) {
     const css = getComputedStyle(document.documentElement);
     const ink = css.getPropertyValue('--ink').trim();
-    const accent = css.getPropertyValue('--accent').trim();
+    const accent = css.getPropertyValue('--orange').trim();
     g.lineCap = 'round';
     g.lineJoin = 'round';
     for (const [id, trail] of this.trails) {

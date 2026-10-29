@@ -34,7 +34,7 @@ export class DebugOverlay {
   draw(ctx: CanvasRenderingContext2D, rect: Rect, signals: HandSignals, stats: Stats) {
     if (!this.visible) return;
     const css = getComputedStyle(document.documentElement);
-    const accent = css.getPropertyValue('--accent').trim() || '#d2452b';
+    const accent = css.getPropertyValue('--orange').trim() || '#c54812';
     const ink = css.getPropertyValue('--ink').trim() || '#000';
 
     ctx.save();

@@ -1,10 +1,10 @@
 import type { HandSignals } from '../../hands';
 import type { Scene, SceneContext } from '../../scene';
-import './netbag.css';
+import './mesh.css';
 import { HandController, dialY, stepDial, DIAL_BOTTOM, DIAL_TOP } from './handcontrol';
 import { HandsUI } from './handsui';
 import { BagWorld, MAX_BALLS, BALL_R, type Ball } from './physics';
-import { drawBall, drawNet } from './render';
+import { drawBall, drawMesh } from './render';
 import { getSprites, type BallSet } from './sprites';
 
 /** What happens to the hook when released. 'stay' keeps it; 'home' springs back to the top centre. */
@@ -34,22 +34,8 @@ function el<K extends keyof HTMLElementTagNameMap>(tag: K, cls: string, text?: s
   return e;
 }
 
-function grainDataUrl() {
-  const c = document.createElement('canvas');
-  c.width = c.height = 160;
-  const g = c.getContext('2d')!;
-  const img = g.createImageData(160, 160);
-  for (let i = 0; i < img.data.length; i += 4) {
-    const v = 200 + Math.random() * 55;
-    img.data[i] = img.data[i + 1] = img.data[i + 2] = v;
-    img.data[i + 3] = 255;
-  }
-  g.putImageData(img, 0, 0);
-  return c.toDataURL();
-}
-
-export class NetBagScene implements Scene {
-  readonly ownsCameraUI = true;
+export class MeshScene implements Scene {
+  readonly help = 'Open hand: raise or lower to set the number. Fist: grab and move the mesh. Swipe: a gust of wind. Mouse: drag the mesh, arrow keys change the number.';
 
   private ctx!: SceneContext;
   private world = new BagWorld();
@@ -123,29 +109,26 @@ export class NetBagScene implements Scene {
 
   private buildUI() {
     const root = this.ctx.overlay;
-    const grain = el('div', 'nb-grain');
-    grain.style.backgroundImage = `url(${grainDataUrl()})`;
-
-    const counter = el('div', 'nb-counter');
-    this.countEl = el('div', 'nb-count', '0');
+    const counter = el('div', 'mesh-counter');
+    this.countEl = el('div', 'mesh-count', '0');
     this.countEl.setAttribute('aria-live', 'polite');
-    this.labelEl = el('div', 'nb-label', 'balls');
-    const minus = el('button', 'nb-step', '−');
+    this.labelEl = el('div', 'mesh-label', 'balls');
+    const minus = el('button', 'mesh-step', '−');
     minus.type = 'button';
     minus.setAttribute('aria-label', 'Remove one');
-    const plus = el('button', 'nb-step', '+');
+    const plus = el('button', 'mesh-step', '+');
     plus.type = 'button';
     plus.setAttribute('aria-label', 'Add one');
     minus.addEventListener('click', () => this.setTarget(this.target - 1));
     plus.addEventListener('click', () => this.setTarget(this.target + 1));
-    const steps = el('div', 'nb-steps');
+    const steps = el('div', 'mesh-steps');
     steps.append(minus, plus);
 
-    const sets = el('div', 'nb-sets');
+    const sets = el('div', 'mesh-sets');
     sets.setAttribute('role', 'group');
     sets.setAttribute('aria-label', 'Ball set (M)');
-    const marbles = el('button', 'nb-set', 'marbles');
-    const fruit = el('button', 'nb-set', 'fruit');
+    const marbles = el('button', 'mesh-set', 'marbles');
+    const fruit = el('button', 'mesh-set', 'fruit');
     marbles.type = fruit.type = 'button';
     marbles.addEventListener('click', () => this.chooseSet('marbles'));
     fruit.addEventListener('click', () => this.chooseSet('fruit'));
@@ -153,7 +136,7 @@ export class NetBagScene implements Scene {
     this.setButtons = { marbles, fruit };
 
     counter.append(this.countEl, this.labelEl, steps, sets);
-    root.append(grain, counter);
+    root.append(counter);
     this.refreshUI();
   }
 
@@ -338,13 +321,13 @@ export class NetBagScene implements Scene {
 
   draw(g: CanvasRenderingContext2D) {
     const { width, height, dpr } = this.ctx.size;
-    g.fillStyle = cssVar('--nb-paper') || '#E9E2D3';
+    g.fillStyle = cssVar('--mesh-paper') || '#E9E2D3';
     g.fillRect(0, 0, width, height);
 
     g.save();
     g.setTransform(dpr * this.scale, 0, 0, dpr * this.scale, dpr * this.offset.x, dpr * this.offset.y);
     for (const b of this.world.balls) drawBall(g, b, this.sprites, BALL_R * b.scale);
-    drawNet(g, this.world, cssVar('--nb-net') || '#F26A1B', 3 / this.scale);
+    drawMesh(g, this.world, cssVar('--mesh-line') || '#F26A1B', 3 / this.scale);
     for (const gh of this.ghosts) {
       const k = gh.age / POP_SECONDS;
       drawBall(g, gh.ball, this.sprites, BALL_R * (1 + 0.15 * k), 1 - k);
@@ -356,8 +339,8 @@ export class NetBagScene implements Scene {
   /** Vertical 0-25 ruler at the right edge: the marker follows the dialling hand. */
   private drawRuler(g: CanvasRenderingContext2D) {
     const { width, height } = this.ctx.size;
-    const ink = cssVar('--nb-ink') || '#1D1D1B';
-    const net = cssVar('--nb-net') || '#F26A1B';
+    const ink = cssVar('--mesh-ink') || '#1D1D1B';
+    const mesh = cssVar('--mesh-line') || '#F26A1B';
     const x = width - 26;
     const y0 = DIAL_TOP * height;
     const y1 = DIAL_BOTTOM * height;
@@ -386,7 +369,7 @@ export class NetBagScene implements Scene {
     for (let i = 0; i <= MAX_BALLS; i += 5) g.fillText(String(i), x - 18, y1 - ((y1 - y0) * i) / MAX_BALLS);
 
     g.globalAlpha = dial.active ? 1 : 0.55;
-    g.fillStyle = net;
+    g.fillStyle = mesh;
     g.beginPath();
     g.moveTo(x + 2, markerY);
     g.lineTo(x - 14, markerY - 8);

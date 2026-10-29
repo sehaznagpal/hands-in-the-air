@@ -3,7 +3,7 @@ import { DebugOverlay } from './debug';
 import { HandSignals } from './hands';
 import { MockHands } from './mock';
 import type { Host, Scene, SceneContext } from './scene';
-import { DEFAULT_SCENE, scenes } from './scenes';
+import { DEFAULT_SCENE, HASH_ALIASES, scenes } from './scenes';
 import { createTracker, ModelError, type HandTracker } from './tracker';
 import { coverRect } from './view';
 
@@ -127,6 +127,7 @@ const sceneCtx: SceneContext = {
   size,
   hands: signals,
   host,
+  previewRect: () => null,
   toScreen(x, y) {
     const r = coverRect(size.width, size.height, aspect());
     return { x: r.x + x * r.w, y: r.y + y * r.h };
@@ -135,6 +136,10 @@ const sceneCtx: SceneContext = {
 
 let scene: Scene | null = null;
 let sceneIndex = -1;
+/** The welcome screen shows until the camera starts (or "use your mouse" is chosen). */
+let welcome = true;
+/** True once the camera was allowed this visit; unlocks the scene toggle for good. */
+let unlocked = false;
 
 function setScene(index: number) {
   if (index < 0 || index >= scenes.length || index === sceneIndex) return;
@@ -142,20 +147,17 @@ function setScene(index: number) {
   overlay.replaceChildren();
   sceneIndex = index;
   scene = scenes[index].create();
-  // The camera is shared by all scenes: switching never starts or stops it.
   scene.init(sceneCtx);
   menu.value = scenes[index].id;
   syncToggle();
   syncChrome();
-  if (host.mock && !scene.ownsCameraUI && !tracking) void host.startTracking();
 }
 
-/** Start button and toolbar show only for scenes without their own camera switch. */
 function syncChrome() {
-  const own = scene?.ownsCameraUI ?? false;
-  intro.hidden = tracking || own || host.mock;
-  toolbar.hidden = !tracking || own || host.mock;
-  badge.hidden = !host.mock;
+  intro.hidden = !welcome;
+  toolbar.hidden = welcome || !tracking;
+  badge.hidden = !host.mock || welcome;
+  syncToggle();
 }
 
 // ------------------------------------------------- scene toggle and routing
@@ -164,28 +166,36 @@ const toggle = $('scene-toggle');
 const toggleButtons = scenes.map((s, i) => {
   const b = document.createElement('button');
   b.type = 'button';
-  b.className = 'scene-option';
+  b.className = 'pill';
   b.textContent = s.name;
   b.setAttribute('role', 'radio');
-  b.addEventListener('click', () => go(i));
+  b.addEventListener('click', () => {
+    if (unlocked) go(i);
+  });
   toggle.appendChild(b);
   return b;
 });
 
 function syncToggle() {
   toggleButtons.forEach((b, i) => {
-    const on = i === sceneIndex;
+    const on = !welcome && i === sceneIndex;
     b.setAttribute('aria-checked', String(on));
-    b.tabIndex = on ? 0 : -1;
+    b.setAttribute('aria-disabled', String(!unlocked));
+    if (unlocked) b.removeAttribute('title');
+    else b.title = 'Start the camera first';
+    b.tabIndex = unlocked && (on || (welcome && i === 0)) ? 0 : -1;
   });
 }
 
-/** Scene to show for the current URL: hash first, then ?scene=, then the default. */
+/** Scene named by the URL hash, or -1. Old hashes are mapped through HASH_ALIASES. */
 function sceneFromUrl() {
-  const hash = location.hash.replace(/^#\/?/, '').toLowerCase();
-  let i = scenes.findIndex((s) => s.hash === hash);
-  if (i < 0) i = scenes.findIndex((s) => s.id === params.get('scene'));
-  return i >= 0 ? i : scenes.findIndex((s) => s.id === DEFAULT_SCENE);
+  const raw = location.hash.replace(/^#\/?/, '').toLowerCase();
+  const hash = HASH_ALIASES[raw] ?? raw;
+  return scenes.findIndex((s) => s.hash === hash);
+}
+
+function defaultScene() {
+  return scenes.findIndex((s) => s.id === DEFAULT_SCENE);
 }
 
 /** Changing the hash adds a history entry, so back and forward just work. */
@@ -195,9 +205,27 @@ function go(index: number) {
   else location.hash = target;
 }
 
-window.addEventListener('hashchange', () => setScene(sceneFromUrl()));
+function replaceHash(index: number) {
+  history.replaceState(null, '', '#' + scenes[index].hash);
+}
+
+/** Leave the welcome screen for the scene in the URL (or the default one). */
+function enterScenes() {
+  welcome = false;
+  const i = sceneFromUrl() >= 0 ? sceneFromUrl() : defaultScene();
+  replaceHash(i);
+  setScene(i);
+  syncChrome();
+}
+
+window.addEventListener('hashchange', () => {
+  const i = sceneFromUrl();
+  if (welcome || i < 0) return;
+  setScene(i);
+});
 
 toggle.addEventListener('keydown', (e) => {
+  if (!unlocked) return;
   const n = scenes.length;
   let next = -1;
   if (e.key === 'ArrowRight' || e.key === 'ArrowDown') next = (sceneIndex + 1) % n;
@@ -258,7 +286,7 @@ function frame(now: number) {
   signals.update(detected, now / 1000, aspect());
 
   g.setTransform(size.dpr, 0, 0, size.dpr, 0, 0);
-  g.fillStyle = getComputedStyle(document.documentElement).getPropertyValue('--paper');
+  g.fillStyle = getComputedStyle(document.documentElement).getPropertyValue('--bg');
   g.fillRect(0, 0, size.width, size.height);
 
   const rect = coverRect(size.width, size.height, aspect());
@@ -293,7 +321,7 @@ window.addEventListener('keydown', (e) => {
   if (e.target instanceof HTMLSelectElement || e.metaKey || e.ctrlKey || e.altKey) return;
   if (e.key === 'd' || e.key === 'D') debug.toggle();
   else if (e.key === '`') menu.hidden = !menu.hidden;
-  else if (e.key >= '1' && e.key <= '3' && Number(e.key) <= scenes.length) go(Number(e.key) - 1);
+  else if (unlocked && !welcome && e.key >= '1' && Number(e.key) <= scenes.length) go(Number(e.key) - 1);
 });
 
 startBtn.addEventListener('click', async () => {
@@ -302,10 +330,14 @@ startBtn.addEventListener('click', async () => {
   const error = await host.startTracking();
   message.textContent = error ?? '';
   startBtn.disabled = false;
+  if (!error) {
+    unlocked = true;
+    enterScenes();
+  }
 });
 stopBtn.addEventListener('click', () => host.stopTracking());
 window.addEventListener('pagehide', () => host.stopTracking());
 
-setScene(sceneFromUrl());
+syncChrome();
 lastFrame = performance.now();
 rafId = requestAnimationFrame(frame);

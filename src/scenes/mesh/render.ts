@@ -43,10 +43,10 @@ export function drawBall(g: CanvasRenderingContext2D, ball: Ball, sprites: BallS
 }
 
 const DIAMONDS_ACROSS = 3;
-const NET_TOP = 1.35;
+const MESH_TOP = 1.35;
 
-/** The orange net: diamond lattice between the edge chains, outline, tie and hanger. */
-export function drawNet(g: CanvasRenderingContext2D, world: BagWorld, color: string, lineWidth: number) {
+/** The orange mesh: diamond lattice between the edge chains, outline, tie and hanger. */
+export function drawMesh(g: CanvasRenderingContext2D, world: BagWorld, color: string, lineWidth: number) {
   const last = LEVELS - 1;
   g.save();
   g.strokeStyle = color;
@@ -62,8 +62,8 @@ export function drawNet(g: CanvasRenderingContext2D, world: BagWorld, color: str
   const p = { x: 0, y: 0 };
   g.beginPath();
   for (let family = 0; family < 2; family++) {
-    for (let c = NET_TOP - wU; c < last; c += du) {
-      const sMin = Math.max(0, (NET_TOP - c) / wU);
+    for (let c = MESH_TOP - wU; c < last; c += du) {
+      const sMin = Math.max(0, (MESH_TOP - c) / wU);
       const sMax = Math.min(1, (last - c) / wU);
       if (sMax - sMin < 0.02) continue;
       const steps = 8;
@@ -102,7 +102,7 @@ export function drawNet(g: CanvasRenderingContext2D, world: BagWorld, color: str
   g.ellipse(cx, cy, half, 0.42, ang, 0, Math.PI * 2);
   g.fill();
 
-  // Hanger: an outline triangle with the net's neck running up into its base.
+  // Hanger: an outline triangle with the mesh's neck running up into its base.
   const hook = world.hook;
   const baseY = hook.y + HANGER_H - 0.9;
   const tl = world.left[0];

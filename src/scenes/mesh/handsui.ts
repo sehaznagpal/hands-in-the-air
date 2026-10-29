@@ -49,43 +49,43 @@ export class HandsUI {
   ) {
     const root = ctx.overlay;
 
-    this.toggle = el('button', 'nb-hands', 'Hands');
+    this.toggle = el('button', 'mesh-hands', 'Hands');
     this.toggle.type = 'button';
     this.toggle.setAttribute('aria-pressed', 'false');
     this.toggle.addEventListener('click', () => void this.click());
-    this.privacy = el('p', 'nb-privacy', 'Your camera stays on your device');
+    this.privacy = el('p', 'mesh-privacy', 'Your camera stays on your device');
     this.privacy.hidden = true;
-    this.status = el('p', 'nb-status');
+    this.status = el('p', 'mesh-status');
     this.status.setAttribute('role', 'status');
     this.status.setAttribute('aria-live', 'polite');
-    const top = el('div', 'nb-topright');
+    const top = el('div', 'mesh-topright');
     top.append(this.toggle, this.privacy, this.status);
 
-    this.preview = el('div', 'nb-preview');
+    this.preview = el('div', 'mesh-preview');
     this.preview.hidden = true;
     this.previewCanvas = document.createElement('canvas');
     this.previewCanvas.setAttribute('aria-label', 'Camera preview with hand skeleton');
     this.previewG = this.previewCanvas.getContext('2d')!;
-    this.previewBtn = el('button', 'nb-preview-btn', 'Hide');
+    this.previewBtn = el('button', 'mesh-preview-btn', 'Hide');
     this.previewBtn.type = 'button';
     this.previewBtn.addEventListener('click', () => this.setPreviewHidden(!this.previewHidden));
     this.preview.append(this.previewCanvas, this.previewBtn);
 
-    this.helpBtn = el('button', 'nb-help-btn', '?');
+    this.helpBtn = el('button', 'mesh-help-btn', '?');
     this.helpBtn.type = 'button';
     this.helpBtn.setAttribute('aria-label', 'How to play');
     this.helpBtn.setAttribute('aria-expanded', 'false');
-    this.card = el('div', 'nb-card');
-    this.card.id = 'nb-card';
+    this.card = el('div', 'mesh-card');
+    this.card.id = 'mesh-card';
     this.card.setAttribute('role', 'dialog');
     this.card.hidden = true;
-    this.helpBtn.setAttribute('aria-controls', 'nb-card');
+    this.helpBtn.setAttribute('aria-controls', 'mesh-card');
     for (const [k, v] of HELP) {
-      const p = el('p', 'nb-card-line');
+      const p = el('p', 'mesh-card-line');
       p.append(el('strong', '', `${k}: `), document.createTextNode(v));
       this.card.append(p);
     }
-    const bottomLeft = el('div', 'nb-bottomleft');
+    const bottomLeft = el('div', 'mesh-bottomleft');
     bottomLeft.append(this.card, this.helpBtn);
 
     root.append(top, this.preview, bottomLeft);
@@ -195,8 +195,8 @@ export class HandsUI {
     const g = this.previewG;
     g.setTransform(dpr, 0, 0, dpr, 0, 0);
     const css = getComputedStyle(document.documentElement);
-    const ink = css.getPropertyValue('--nb-ink').trim() || '#1D1D1B';
-    const net = css.getPropertyValue('--nb-net').trim() || '#F26A1B';
+    const ink = css.getPropertyValue('--mesh-ink').trim() || '#1D1D1B';
+    const mesh = css.getPropertyValue('--mesh-line').trim() || '#F26A1B';
     g.fillStyle = ink;
     g.fillRect(0, 0, w, h);
 
@@ -234,7 +234,7 @@ export class HandsUI {
         g.arc(pt.x, pt.y, 2, 0, Math.PI * 2);
         g.fill();
       }
-      g.fillStyle = net;
+      g.fillStyle = mesh;
       for (const li of FINGERTIP_INDEX) {
         g.beginPath();
         g.arc(p[li].x, p[li].y, 5, 0, Math.PI * 2);
@@ -242,7 +242,7 @@ export class HandsUI {
       }
       const mode = controller.mode[hand.label];
       if (mode !== 'idle') {
-        g.fillStyle = mode === 'fist' ? net : '#fff';
+        g.fillStyle = mode === 'fist' ? mesh : '#fff';
         g.font = '600 11px ui-monospace, Menlo, monospace';
         g.fillText(mode === 'fist' ? 'grab' : 'dial', p[0].x - 12, p[0].y + 16);
       }

@@ -24,13 +24,15 @@ export interface SceneContext {
   size: { width: number; height: number; dpr: number };
   hands: HandSignals;
   host: Host;
+  /** Screen rectangle taken by the camera preview (or its small button), null while the camera is off. */
+  previewRect(): DOMRect | null;
   /** Normalised mirrored hand coordinates to canvas CSS pixels (camera "cover" fit). */
   toScreen(x: number, y: number): { x: number; y: number };
 }
 
 export interface Scene {
-  /** Set when the scene has its own camera switch, so the Start button stays hidden. */
-  readonly ownsCameraUI?: boolean;
+  /** Copy for the help card shown from the "?" button. */
+  readonly help: string;
   init(ctx: SceneContext): void;
   update(hands: HandSignals, dt: number): void;
   /** The canvas is already cleared to the paper colour and scaled to CSS pixels. */

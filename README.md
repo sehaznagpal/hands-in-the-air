@@ -17,7 +17,7 @@ npm test           # unit tests for the hand signals
 npm run build      # static output in dist/ (works on Vercel as-is)
 ```
 
-The app is called Hand Lab. Routes: `#netbag` (the default, works without a camera) and `#canvas` (Hand Canvas, needs the camera; click **Start camera**). The camera is shared, so switching scenes never restarts it. No camera? Open `/?mock=1` for two simulated hands.
+The app is called Hand Lab. Routes: `#mesh` (the default, works without a camera) and `#canvas` (Hand Canvas, needs the camera; click **Start camera**). The camera is shared, so switching scenes never restarts it. No camera? Open `/?mock=1` for two simulated hands.
 
 | Key | Action |
 | --- | --- |
@@ -74,11 +74,11 @@ thumb to pinky.
 a slow vertical slide and an occasional swipe) running through the same signal
 pipeline. Use it for testing and as a fallback demo.
 
-## Scene: net bag
+## Scene: mesh bag
 
 A hanging orange mesh bag that holds 0 to 25 balls. The bag lengthens and bulges to
 match the count, swings from its hook like a pendulum, and the balls slosh inside.
-Open it with key `2`, the dev menu, or `/?scene=net-bag` (add `&mock=1` to drive it
+Open it with key `2`, the dev menu, or `/?scene=mesh` (add `&mock=1` to drive it
 with simulated hands).
 
 **Mouse, touch and keyboard (always on)**
@@ -103,9 +103,9 @@ with simulated hands).
 A ruler at the right edge shows the dial, and a mirrored camera preview (bottom
 right, hide button included) shows the skeleton and fingertips.
 
-**Tuning.** Colours are CSS variables (`--nb-paper`, `--nb-net`, `--nb-ink`) in
-`src/style.css`. Physics numbers live in `TUNING` in `src/scenes/netbag/physics.ts`;
-`RELEASE_MODE` in `src/scenes/netbag/index.ts` switches between the hook staying put
+**Tuning.** Colours are CSS variables (`--mesh-paper`, `--mesh-line`, `--mesh-ink`) in
+`src/style.css`. Physics numbers live in `TUNING` in `src/scenes/mesh/physics.ts`;
+`RELEASE_MODE` in `src/scenes/mesh/index.ts` switches between the hook staying put
 and springing back to the top centre. The physics is plain Verlet (no library) and is
 unit-tested headless: `npm test`.
 
