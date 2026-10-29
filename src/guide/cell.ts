@@ -76,7 +76,7 @@ export class GuideCell {
 }
 
 /** Draw a guide hand from a timeline state; (x, y) is the middle of the hand as a share of the cell. */
-export function drawGuideHand(g: CanvasRenderingContext2D, w: number, h: number, s: State, tip: string, size = 0.62) {
+export function drawGuideHand(g: CanvasRenderingContext2D, w: number, h: number, s: State, tip: string, size = 0.5) {
   const pose = blendPose(OPEN_PALM, FIST, s.blend);
   const S = h * size * s.scale;
   const c = Math.cos(s.rotation);
@@ -86,7 +86,10 @@ export function drawGuideHand(g: CanvasRenderingContext2D, w: number, h: number,
     const ly = p.y - HAND_CENTER.y;
     return { x: s.x * w + (lx * c - ly * n) * S, y: s.y * h + (lx * n + ly * c) * S };
   });
+  g.save();
+  g.globalAlpha = s.alpha;
   drawSkeleton(g, pts, tip);
+  g.restore();
 }
 
 /** One shared requestAnimationFrame loop for every open cell. It runs only while cells are active and the tab is visible. */

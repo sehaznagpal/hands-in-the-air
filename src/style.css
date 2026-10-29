@@ -386,3 +386,14 @@ button:focus-visible { outline: 3px solid var(--blue); outline-offset: 3px; }
   overflow: auto;
   touch-action: auto;
 }
+.guide-badge {
+  position: absolute;
+  top: 8px;
+  left: 8px;
+  padding: 2px 9px;
+  font-size: 11px;
+  line-height: 18px;
+  color: var(--bg);
+  background: var(--blue);
+  border-radius: 999px;
+}

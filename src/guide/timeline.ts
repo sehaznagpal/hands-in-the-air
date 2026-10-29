@@ -11,6 +11,8 @@ export interface Keyframe {
   blend?: number;
   /** A free 0-1 channel for overlays (counter, arrows, wind). */
   v?: number;
+  /** Hand opacity, 1 by default. */
+  alpha?: number;
 }
 
 export interface State {
@@ -20,10 +22,11 @@ export interface State {
   scale: number;
   blend: number;
   v: number;
+  alpha: number;
 }
 
 const ease = (x: number) => x * x * (3 - 2 * x);
-const full = (k: Keyframe): State => ({ x: k.x, y: k.y, rotation: k.rotation ?? 0, scale: k.scale ?? 1, blend: k.blend ?? 0, v: k.v ?? 0 });
+const full = (k: Keyframe): State => ({ x: k.x, y: k.y, rotation: k.rotation ?? 0, scale: k.scale ?? 1, blend: k.blend ?? 0, v: k.v ?? 0, alpha: k.alpha ?? 1 });
 
 export class Timeline {
   constructor(
