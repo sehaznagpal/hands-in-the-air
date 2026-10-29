@@ -3,6 +3,11 @@
   --paper: #f1ead8;
   --ink: #1f1b16;
   --accent: #d2452b;
+  /* Net bag scene */
+  --nb-paper: #E9E2D3;
+  --nb-net: #F26A1B;
+  --nb-ink: #1D1D1B;
+
   --font: ui-serif, Georgia, 'Times New Roman', serif;
   --mono: ui-monospace, Menlo, Consolas, monospace;
 }
