@@ -1,15 +1,14 @@
 import type { HandSignals } from '../../hands';
 import type { Scene, SceneContext } from '../../scene';
 import './mesh.css';
-import { HandController, stepDial } from './handcontrol';
+import { DialDriver, HandController, smoothToward } from './handcontrol';
 import { BagWorld, MAX_BALLS, BALL_R, type Ball } from './physics';
 import { drawBall, drawMesh } from './render';
+import { TUNING } from './tuning';
 import { getSprites, type BallSet } from './sprites';
 
 /** What happens to the hook when released. 'stay' keeps it; 'home' springs back to the top centre. */
 const RELEASE_MODE: 'stay' | 'home' = 'stay';
-/** Count changes per second at most. */
-const MAX_CHANGES_PER_SEC = 6;
 /** How much of the free area the bag may fill. */
 const FIT_HEIGHT = 0.95;
 const FIT_WIDTH = 0.85;
@@ -67,6 +66,9 @@ export class MeshScene implements Scene {
   private cleanup: (() => void)[] = [];
 
   private controller = new HandController();
+  private dialDriver = new DialDriver();
+  /** Fist position after smoothing; null while no fist is closed. */
+  private fist: { x: number; y: number } | null = null;
   private handsOn = false;
 
   private countEl!: HTMLElement;
@@ -89,7 +91,7 @@ export class MeshScene implements Scene {
       ctx.hands.on('swipe', (e) => {
         if (!this.handsOn || e.openness < 0.5) return;
         const dir = e.direction === 'right' ? 1 : -1;
-        this.world.gust(dir * Math.min(16, 6 + 3 * e.speed));
+        this.world.gust(dir * TUNING.gustScale * Math.min(16, 6 + 3 * e.speed));
       }),
     );
   }
@@ -299,11 +301,17 @@ export class MeshScene implements Scene {
     if (this.handsOn) {
       this.controller.update(hands, dt);
       const { dial, grab } = this.controller;
-      if (dial.active) this.setTarget(stepDial(this.target, dial.raw));
+      this.setTarget(this.dialDriver.update(dial.active, dial.y, dt, this.target));
       if (grab && !this.drag) {
         this.moved = true;
-        this.goal.x = grab.x;
-        this.goal.y = grab.y;
+        // Start from where the bag is, then ease toward the fist: a grab never jerks the hook.
+        const f = (this.fist ??= { x: this.goal.x, y: this.goal.y });
+        f.x = smoothToward(f.x, grab.x, dt, TUNING.fistSmoothSeconds);
+        f.y = smoothToward(f.y, grab.y, dt, TUNING.fistSmoothSeconds);
+        this.goal.x = f.x;
+        this.goal.y = f.y;
+      } else {
+        this.fist = null;
       }
     }
 
@@ -311,12 +319,12 @@ export class MeshScene implements Scene {
     this.changeTimer = Math.max(0, this.changeTimer - dt);
     if (this.changeTimer === 0 && this.target !== world.balls.length) {
       if (this.target > world.balls.length) {
-        if (world.addBall()) this.changeTimer = 1 / MAX_CHANGES_PER_SEC;
+        if (world.addBall()) this.changeTimer = 1 / TUNING.worldChangesPerSec;
       } else {
         const ball = world.removeTop();
         if (ball) {
           this.ghosts.push({ ball, age: 0 });
-          this.changeTimer = 1 / MAX_CHANGES_PER_SEC;
+          this.changeTimer = 1 / TUNING.worldChangesPerSec;
         }
       }
     }

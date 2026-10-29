@@ -1,30 +1,58 @@
 import { describe, expect, it } from 'vitest';
 import { HandSignals } from '../../hands';
 import { MockHands, mockHand, type HandPose } from '../../mock';
-import { HandController, dialRaw, dialY, stepDial, DIAL_BOTTOM, DIAL_TOP } from './handcontrol';
+import { DialDriver, HandController, stepDial } from './handcontrol';
 
 describe('dial maths', () => {
-  it('maps the zone to 0..25 and back', () => {
-    expect(dialRaw(DIAL_TOP)).toBe(25);
-    expect(dialRaw(DIAL_BOTTOM)).toBe(0);
-    expect(dialRaw(0)).toBe(25);
-    expect(dialRaw(1)).toBe(0);
-    expect(dialY(25)).toBeCloseTo(DIAL_TOP);
-    expect(dialY(0)).toBeCloseTo(DIAL_BOTTOM);
-  });
-
   it('snaps with hysteresis so a boundary does not flicker', () => {
     let n = 10;
-    for (const raw of [10.4, 10.7, 10.79, 10.6, 10.81]) {
+    for (const raw of [10.4, 10.9, 11.09, 10.8, 11.11]) {
       const next = stepDial(n, raw);
-      if (raw < 10.8) expect(next).toBe(10);
+      if (raw < 11.1) expect(next).toBe(10);
       n = next;
     }
     expect(n).toBe(11);
-    expect(stepDial(11, 10.3)).toBe(11);
-    expect(stepDial(11, 10.19)).toBe(10);
+    expect(stepDial(11, 10.0)).toBe(11);
+    expect(stepDial(11, 9.89)).toBe(10);
     expect(stepDial(0, -3)).toBe(0);
     expect(stepDial(25, 99)).toBe(25);
+  });
+});
+
+describe('DialDriver', () => {
+  const run = (d: DialDriver, from: number, seconds: number, y: (t: number) => number, active = true) => {
+    let n = from;
+    const dt = 1 / 30;
+    for (let t = 0; t < seconds; t += dt) n = d.update(active, y(t), dt, n);
+    return n;
+  };
+
+  it('does not change the count while the hand moves in or before it has been steady', () => {
+    const d = new DialDriver();
+    expect(run(d, 10, 1, (t) => 0.9 - 0.5 * t)).toBe(10);
+    const e = new DialDriver();
+    expect(run(e, 10, 0.25, () => 0.5)).toBe(10);
+  });
+
+  it('is relative to the count when it engages and limited to 3 balls a second', () => {
+    const d = new DialDriver();
+    let n = run(d, 10, 0.6, () => 0.5);
+    expect(n).toBe(10);
+    const dt = 1 / 30;
+    const log: number[] = [];
+    for (let t = 0; t < 2; t += dt) {
+      n = d.update(true, 0.5 - 0.5 * Math.min(1, t / 0.3), dt, n);
+      log.push(n);
+    }
+    for (let i = 30; i < log.length; i++) expect(log[i] - log[i - 30]).toBeLessThanOrEqual(3);
+    expect(n).toBeGreaterThan(10);
+  });
+
+  it('holds when the hand is lost', () => {
+    const d = new DialDriver();
+    let n = run(d, 10, 0.6, () => 0.5);
+    n = run(d, n, 1, () => 0.2, false);
+    expect(n).toBe(10);
   });
 });
 
@@ -81,43 +109,35 @@ describe('HandController', () => {
     const sig = new HandSignals();
     const ctl = new HandController();
     const t = drive(sig, ctl, 0, 10, () => [pose('Right', { y: 0.3 })]);
-    const raw = ctl.dial.raw;
+    const y = ctl.dial.y;
     drive(sig, ctl, t, 20, () => []);
     expect(ctl.dial.active).toBe(false);
-    expect(ctl.dial.raw).toBe(raw);
+    expect(ctl.dial.y).toBe(y);
   });
 
-  it('mock hands exercise the whole range and a grab without flicker', () => {
+  it('mock hands engage the dial and grab without flicker', () => {
     const sig = new HandSignals();
     const ctl = new HandController();
     const mock = new MockHands();
+    const driver = new DialDriver();
     let n = 0;
     let min = 25;
     let max = 0;
-    let changes = 0;
     let grabFrames = 0;
     const perSecond = new Map<number, number>();
     for (let i = 0; i < 30 * 70; i++) {
       const t = i / 30;
       sig.update(mock.sample(t), t);
       ctl.update(sig, 1 / 30);
-      if (ctl.dial.active) {
-        const next = stepDial(n, ctl.dial.raw);
-        if (next !== n) {
-          changes++;
-          perSecond.set(Math.floor(t), (perSecond.get(Math.floor(t)) ?? 0) + 1);
-        }
-        n = next;
-      }
+      const next = driver.update(ctl.dial.active, ctl.dial.y, 1 / 30, n);
+      if (next !== n) perSecond.set(Math.floor(t), (perSecond.get(Math.floor(t)) ?? 0) + 1);
+      n = next;
       min = Math.min(min, n);
       max = Math.max(max, n);
       if (ctl.grab) grabFrames++;
     }
-    expect(min).toBe(0);
-    expect(max).toBe(25);
+    expect(max - min).toBeGreaterThan(3);
     expect(grabFrames).toBeGreaterThan(30 * 20);
-    // 25 steps up and down per 30 s sweep: smooth, never a burst of flicker.
-    expect(changes).toBeLessThan(160);
-    expect(Math.max(...perSecond.values())).toBeLessThanOrEqual(4);
+    expect(Math.max(...perSecond.values())).toBeLessThanOrEqual(3);
   });
 });

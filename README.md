@@ -1,4 +1,4 @@
-# Hand Canvas
+# Hand Lab
 
 A starter for browser scenes you control with your hands through the webcam.
 Static Vite + TypeScript, no framework, plain CSS. Tracking runs locally with
@@ -17,7 +17,7 @@ npm test           # unit tests for the hand signals
 npm run build      # static output in dist/ (works on Vercel as-is)
 ```
 
-The app is called Hand Lab. Routes: `#mesh` (the default, works without a camera) and `#canvas` (Hand Canvas, needs the camera; click **Start camera**). The camera is shared, so switching scenes never restarts it. No camera? Open `/?mock=1` for two simulated hands.
+The app opens on a welcome screen; **Start your camera to begin** asks for the camera and opens Canvas. Routes: `#canvas` and `#mesh` (the old `#netbag` redirects to `#mesh`); both show the welcome screen first. The toggle at the top is inactive until the camera has been allowed. The camera is shared, so switching scenes never restarts it, and **stop camera** / **start camera** sit bottom left next to the **?** help button. The preview (bottom right) can be minimised to a round button. No camera? Open `/?mock=1` for two simulated hands (`?mock=idle` shows the simulated camera with no hands, handy for layout checks).
 
 | Key | Action |
 | --- | --- |
@@ -28,7 +28,7 @@ The app is called Hand Lab. Routes: `#mesh` (the default, works without a camera
 ## Theme
 
 Colours and fonts are CSS variables at the top of `src/style.css`
-(`--paper`, `--ink`, `--accent`).
+(`--bg`, `--ink`, `--orange`, `--blue`). Fonts (Clash Grotesk, Atelier) are in `public/fonts`.
 
 ## Hand signals (`src/hands.ts`)
 
@@ -65,8 +65,8 @@ thumb to pinky.
 
 2. Register it in `src/scenes/index.ts`. Keys `1`-`3` pick the first three.
 3. Use `ctx.toScreen(x, y)` to turn hand coordinates into canvas pixels. Put DOM UI in
-   `ctx.overlay`. Set `ownsCameraUI = true` if the scene has its own camera switch
-   (the Start button is then hidden; call `ctx.host.startTracking()`).
+   `ctx.overlay`. Give the scene a `help` string for the help card. The camera is
+   owned by the app; read `ctx.host.tracking` and `ctx.previewRect()` to lay out around the preview.
 
 ## Mock mode
 
@@ -91,20 +91,18 @@ with simulated hands).
 | `M` or the marbles / fruit toggle | Switch ball set |
 | `?` button (hover or click) | Help card; `Esc` or a click outside closes it |
 
-**Hands** (top right toggle, off by default; it asks for the camera and shows
-"Your camera stays on your device")
+**Hands** (whenever the camera is on)
 
 | Gesture | Action |
 | --- | --- |
-| Open hand, raise or lower | Dial: palm height sets the count (top of the ruler 25, bottom 0). Snaps with hysteresis. If both hands are open the right one wins. Closing the hand locks the value; losing the hand holds it |
+| Open hand, raise or lower | Dial: after the hand has been open and steady for 300 ms, raising or lowering the palm changes the count from where it is (palm travel of a full frame height spans 0 to 25), smoothed, at most 3 balls per second. If both hands are open the right one wins. Closing the hand locks the value; losing the hand holds it |
 | Fist (openness below 0.25 for 120 ms), either hand | Grab: the hook follows the fist. Opening the hand (above 0.5) releases; the hook stays where it is |
 | Fast open-hand swipe left or right | Gust of wind |
 
-A ruler at the right edge shows the dial, and a mirrored camera preview (bottom
-right, hide button included) shows the skeleton and fingertips.
+The shared camera preview (bottom right) shows the skeleton and fingertips.
 
-**Tuning.** Colours are CSS variables (`--mesh-paper`, `--mesh-line`, `--mesh-ink`) in
-`src/style.css`. Physics numbers live in `TUNING` in `src/scenes/mesh/physics.ts`;
+**Tuning.** Colours are the CSS variables in `src/style.css`. Every physics and control number
+lives in the one `TUNING` block in `src/scenes/mesh/tuning.ts`;
 `RELEASE_MODE` in `src/scenes/mesh/index.ts` switches between the hook staying put
 and springing back to the top centre. The physics is plain Verlet (no library) and is
 unit-tested headless: `npm test`.

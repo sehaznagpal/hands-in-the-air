@@ -3,6 +3,8 @@
  * Pure TypeScript, no DOM, so it can be tested headless. Units: ball radius = 1.
  */
 
+import { TUNING } from './tuning';
+
 export const LEVELS = 14;
 export const MAX_BALLS = 25;
 export const BALL_R = 1;
@@ -27,44 +29,7 @@ const NECK_HALF = 0.45;
 /** Width of the bag at each level, relative to the full width. */
 export const PROFILE = [0.12, 0.16, 0.42, 0.74, 0.92, 1, 1, 1, 1, 1, 0.97, 0.9, 0.78, 0.55];
 
-export const TUNING = {
-  /** Fixed substep, 4 per 60 fps frame. */
-  step: 1 / 240,
-  iterations: 6,
-  gravity: 150,
-  /** Full width at rest, about 2.2 ball diameters. */
-  widthRest: 4.4,
-  /** Hard cap on width, 3 ball diameters. */
-  widthHard: 6,
-  /** Width the empty, limp mesh settles toward. */
-  widthLimp: 0.55,
-  /**
-   * Soft constraint stiffness per iteration. Effective spring constant is k * iterations / step^2,
-   * so these must be small for a ball's weight to be able to move the mesh.
-   */
-  stretchK: 0.2,
-  widthK: 0.004,
-  limpK: 0.0004,
-  /** Strength of the spring that opens the bag to match its ball count. */
-  bulgeK: 0.004,
-  /** Spring that pulls segments to the length the current ball count needs. */
-  lengthK: 0.02,
-  maxStretch: 1.6,
-  wallDamp: 0.997,
-  /** Largest wall particle move per substep (units). */
-  wallMaxMove: 0.25,
-  ballDamp: 0.9995,
-  ballMass: 3,
-  /** Extra velocity damping per substep for balls in contact (rolling resistance). */
-  contactDamp: 0.985,
-  hookOmega: 16,
-  hookMaxSpeed: 40,
-  hookMaxAccel: 140,
-  hookMaxDownAccel: 50,
-  /** Speed below which (units/s) the bag may sleep. */
-  sleepSpeed: 0.4,
-  sleepAfter: 0.6,
-};
+export { TUNING };
 
 export interface Particle {
   x: number;
@@ -84,6 +49,17 @@ export interface Ball {
   scale: number;
   angle: number;
   touched: boolean;
+  /** Contact bookkeeping for one substep: summed surface normal, kinds of contact, velocity before solving. */
+  nx: number;
+  ny: number;
+  hitBall: boolean;
+  hitWall: boolean;
+  vx0: number;
+  vy0: number;
+  /** Number of contacts and the sum of the velocities of what the ball touches. */
+  nc: number;
+  svx: number;
+  svy: number;
 }
 
 const particle = (x: number, y: number, inv = 1): Particle => ({ x, y, px: x, py: y, inv });
@@ -99,6 +75,8 @@ export class BagWorld {
   private nextId = 0;
   private acc = 0;
   private calm = 0;
+  /** True while gliding to rest: extra damping once the hook has stopped and the mesh is slow. */
+  private settling = false;
   private walls: Particle[];
   /** Extra segment length added while the mouth stays blocked, so the bag always makes room. */
   private boost = 0;
@@ -146,6 +124,15 @@ export class BagWorld {
       scale: 0.6,
       angle: this.rng() * Math.PI * 2,
       touched: false,
+      nx: 0,
+      ny: 0,
+      hitBall: false,
+      hitWall: false,
+      vx0: 0,
+      vy0: 0,
+      nc: 0,
+      svx: 0,
+      svy: 0,
     };
     this.balls.push(ball);
     this.wake();
@@ -230,10 +217,14 @@ export class BagWorld {
   private updateSleep(elapsed: number) {
     const moving =
       Math.abs(this.hookTarget.x - this.hook.x) + Math.abs(this.hookTarget.y - this.hook.y) > 1e-3;
-    if (!moving && this.maxSpeed() < TUNING.sleepSpeed) this.calm += elapsed;
+    const speed = this.maxSpeed();
+    if (moving || speed > TUNING.settleBelow * 1.5) this.settling = false;
+    else if (speed < TUNING.settleBelow) this.settling = true;
+    if (!moving && speed < TUNING.sleepSpeed) this.calm += elapsed;
     else this.calm = 0;
     if (this.calm > TUNING.sleepAfter) {
       this.sleeping = true;
+      this.settling = false;
       for (const p of this.walls) {
         p.px = p.x;
         p.py = p.y;
@@ -247,26 +238,32 @@ export class BagWorld {
 
   private moveHook(h: number) {
     const T = TUNING;
-    // Velocity-limited, acceleration-limited follow: a hand can jerk, the bag only feels a firm tug.
+    // Critically damped spring toward the target: no overshoot, a firm but soft catch-up.
+    const w = 4.74 / T.hookFollowSeconds;
     const dx = this.hookTarget.x - this.hook.x;
     const dy = this.hookTarget.y - this.hook.y;
-    const dist = Math.hypot(dx, dy);
-    // Fast enough to arrive, slow enough to brake in time, never above the speed limit.
-    const want = Math.min(T.hookMaxSpeed, dist * T.hookOmega, Math.sqrt(1.2 * T.hookMaxAccel * dist));
-    const wx = dist > 1e-9 ? (dx / dist) * want : 0;
-    const wy = dist > 1e-9 ? (dy / dist) * want : 0;
-    let ax = wx - this.hookVel.x;
-    let ay = wy - this.hookVel.y;
+    if (Math.hypot(dx, dy) < 0.04 && Math.hypot(this.hookVel.x, this.hookVel.y) < 0.4) {
+      this.hook.x = this.hookTarget.x;
+      this.hook.y = this.hookTarget.y;
+      this.hookVel.x = this.hookVel.y = 0;
+      return;
+    }
+    let ax = w * w * dx - 2 * w * this.hookVel.x;
+    let ay = w * w * dy - 2 * w * this.hookVel.y;
     const al = Math.hypot(ax, ay);
-    const maxA = T.hookMaxAccel * h;
-    if (al > maxA) {
-      ax *= maxA / al;
-      ay *= maxA / al;
+    if (al > T.hookMaxAccel) {
+      ax *= T.hookMaxAccel / al;
+      ay *= T.hookMaxAccel / al;
     }
     // Speeding up downward slower than gravity keeps the mesh taut, so the pile never crashes into the neck.
-    ay = Math.min(ay, T.hookMaxDownAccel * h);
-    this.hookVel.x += ax;
-    this.hookVel.y += ay;
+    ay = Math.min(ay, T.hookMaxDownAccel);
+    this.hookVel.x += ax * h;
+    this.hookVel.y += ay * h;
+    const sp = Math.hypot(this.hookVel.x, this.hookVel.y);
+    if (sp > T.hookMaxSpeed) {
+      this.hookVel.x *= T.hookMaxSpeed / sp;
+      this.hookVel.y *= T.hookMaxSpeed / sp;
+    }
     this.hook.x += this.hookVel.x * h;
     this.hook.y += this.hookVel.y * h;
   }
@@ -278,8 +275,9 @@ export class BagWorld {
 
     for (const p of this.walls) {
       if (!p.inv) continue;
-      let vx = (p.x - p.px) * TUNING.wallDamp;
-      let vy = (p.y - p.py) * TUNING.wallDamp;
+      const damp = TUNING.wallDamp * (this.settling ? TUNING.settleDamp : 1);
+      let vx = (p.x - p.px) * damp;
+      let vy = (p.y - p.py) * damp;
       // A whipped hook must not be able to fling the mesh into a tangle.
       const sp = Math.hypot(vx, vy);
       if (sp > TUNING.wallMaxMove) {
@@ -288,12 +286,13 @@ export class BagWorld {
       }
       p.px = p.x;
       p.py = p.y;
-      p.x += vx;
+      p.x += vx + (this.hook.x - p.x) * TUNING.swingPull * h * h;
       p.y += vy + g;
     }
     for (const b of this.balls) {
-      const vx = (b.x - b.px) * TUNING.ballDamp;
-      const vy = (b.y - b.py) * TUNING.ballDamp;
+      const bd = TUNING.ballDamp * (this.settling ? TUNING.settleDamp : 1);
+      const vx = (b.x - b.px) * bd;
+      const vy = (b.y - b.py) * bd;
       // Rolling: spin follows horizontal travel.
       b.angle += vx / (BALL_R * b.scale);
       b.px = b.x;
@@ -302,6 +301,11 @@ export class BagWorld {
       b.y += vy + g;
       b.scale = Math.min(1, b.scale + h * ((1 - 0.6) / 0.15));
       b.touched = false;
+      b.nx = b.ny = 0;
+      b.nc = b.svx = b.svy = 0;
+      b.hitBall = b.hitWall = false;
+      b.vx0 = b.x - b.px;
+      b.vy0 = b.y - b.py;
     }
     this.pin();
     this.updateOccupancy();
@@ -326,9 +330,39 @@ export class BagWorld {
       }
       if (this.escaped(b)) this.respawn(b);
       if (!b.touched) continue;
+      this.settleContact(b);
       b.px = b.x - (b.x - b.px) * cd;
       b.py = b.y - (b.y - b.py) * cd;
     }
+  }
+
+  /** Takes the bounce out of a contact (restitution) and bleeds sideways speed (friction). */
+  private settleContact(b: Ball) {
+    const T = TUNING;
+    // Work in the frame of whatever the ball touches, so friction never fights the mesh's own motion.
+    const sx = b.svx / b.nc;
+    const sy = b.svy / b.nc;
+    let vx = b.x - b.px - sx;
+    let vy = b.y - b.py - sy;
+    const nl = Math.hypot(b.nx, b.ny);
+    // Crowded contacts push from all sides: only trust a clear surface direction.
+    if (nl > 0.5 * b.nc) {
+      const nx = b.nx / nl;
+      const ny = b.ny / nl;
+      const pre = (b.vx0 - sx) * nx + (b.vy0 - sy) * ny;
+      const vn = vx * nx + vy * ny;
+      const keep = pre < 0 ? -T.ballRestitution * pre : Math.max(0, vn);
+      if (vn > keep) {
+        vx -= (vn - keep) * nx;
+        vy -= (vn - keep) * ny;
+      }
+      const fr = Math.min(0.5, (b.hitBall ? T.ballFriction : 0) + (b.hitWall ? T.wallFriction : 0));
+      const vn2 = vx * nx + vy * ny;
+      vx -= (vx - vn2 * nx) * fr;
+      vy -= (vy - vn2 * ny) * fr;
+    }
+    b.px = b.x - (vx + sx);
+    b.py = b.y - (vy + sy);
   }
 
   /** How much each level holds a ball nearby, 0 to 1. Computed once per substep. */
@@ -400,6 +434,10 @@ export class BagWorld {
     const body = bodySeg(n, this.boost);
     for (let i = 0; i < LEVELS - 1; i++) {
       const seg = i < NECK_SEGS ? NECK_SEG : body;
+      this.dashpot(left[i], left[i + 1]);
+      this.dashpot(right[i], right[i + 1]);
+      this.dashpot(left[i], right[i + 1]);
+      this.dashpot(right[i], left[i + 1]);
       for (const chain of [left, right]) {
         const a = chain[i];
         const b = chain[i + 1];
@@ -423,6 +461,7 @@ export class BagWorld {
       const a = left[i];
       const b = right[i];
       this.keepUntwisted(i);
+      this.dashpot(a, b);
       const rest = T.widthRest * PROFILE[i];
       const hard = T.widthHard * PROFILE[i];
       const limp = i === LEVELS - 1 ? 1.1 : T.widthLimp;
@@ -438,6 +477,24 @@ export class BagWorld {
       this.pull(a, b, hard, 1);
       this.push(a, b, Math.min(0.5, rest * 0.5), 1);
     }
+  }
+
+  /** Removes part of the relative speed along a link, so the mesh stops wobbling. */
+  private dashpot(a: Particle, b: Particle) {
+    const w = a.inv + b.inv;
+    if (!w) return;
+    const dx = b.x - a.x;
+    const dy = b.y - a.y;
+    const d = Math.hypot(dx, dy);
+    if (d < 1e-9) return;
+    const ux = dx / d;
+    const uy = dy / d;
+    const rel = (b.x - b.px - (a.x - a.px)) * ux + (b.y - b.py - (a.y - a.py)) * uy;
+    const c = (rel * TUNING.wallConstraintDamp) / w;
+    a.px -= ux * c * a.inv;
+    a.py -= uy * c * a.inv;
+    b.px += ux * c * b.inv;
+    b.py += uy * c * b.inv;
   }
 
   /** The right edge must stay on the right of travel: stops the bag twisting or turning inside out. */
@@ -488,6 +545,17 @@ export class BagWorld {
         b.x += nx * half;
         b.y += ny * half;
         a.touched = b.touched = true;
+        a.hitBall = b.hitBall = true;
+        a.nc++;
+        b.nc++;
+        a.svx += b.x - b.px;
+        a.svy += b.y - b.py;
+        b.svx += a.x - a.px;
+        b.svy += a.y - a.py;
+        a.nx -= nx;
+        a.ny -= ny;
+        b.nx += nx;
+        b.ny += ny;
       }
     }
   }
@@ -548,6 +616,12 @@ export class BagWorld {
       ball.x += dirx * lambda * invBall;
       ball.y += diry * lambda * invBall;
       ball.touched = true;
+      ball.hitWall = true;
+      ball.nc++;
+      ball.svx += (1 - tc) * (a.x - a.px) + tc * (b.x - b.px);
+      ball.svy += (1 - tc) * (a.y - a.py) + tc * (b.y - b.py);
+      ball.nx += dirx;
+      ball.ny += diry;
       if (a.inv) {
         a.x -= dirx * lambda * (1 - tc) * a.inv;
         a.y -= diry * lambda * (1 - tc) * a.inv;

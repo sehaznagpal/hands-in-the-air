@@ -25,9 +25,6 @@
   --font-display: 'Atelier', 'Clash Grotesk', ui-sans-serif, sans-serif;
   --mono: ui-monospace, Menlo, Consolas, monospace;
   /* Space between the screen edge and the corner UI (Figma: 48px). */
-  --mesh-paper: var(--bg);
-  --mesh-ink: var(--ink);
-  --mesh-line: var(--orange);
   --edge: 48px;
   /* Bottom of the scene toggle; scene content starts below this. */
   --top-h: 104px;
@@ -191,15 +188,6 @@ button:focus-visible { outline: 3px solid var(--blue); outline-offset: 3px; }
   color: var(--ink);
 }
 #message:empty { display: none; }
-.welcome-link {
-  margin: 0.6rem 0 0 0.25rem;
-  font-size: 16px;
-  color: var(--ink);
-  text-decoration: underline;
-  text-underline-offset: 3px;
-  opacity: 0.75;
-}
-.welcome-link:hover { opacity: 1; }
 .welcome-foot-left, .welcome-foot-right {
   position: absolute;
   bottom: max(var(--edge), env(safe-area-inset-bottom));

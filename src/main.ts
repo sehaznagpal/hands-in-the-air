@@ -13,7 +13,6 @@ const canvas = $<HTMLCanvasElement>('stage');
 const video = $<HTMLVideoElement>('video');
 const intro = $('intro');
 const startBtn = $<HTMLButtonElement>('start');
-const useMouseBtn = $<HTMLButtonElement>('use-mouse');
 const message = $('message');
 const overlay = $('overlay');
 const app = $('app');
@@ -368,13 +367,6 @@ startBtn.addEventListener('click', async () => {
   enterScenes();
 });
 
-/** Mouse and keyboard only: Mesh Bag without a camera, toggle stays disabled. */
-useMouseBtn.addEventListener('click', () => {
-  const i = scenes.findIndex((s) => s.id === 'mesh');
-  replaceHash(i);
-  setScene(i);
-  leaveWelcome();
-});
 window.addEventListener('pagehide', () => host.stopTracking());
 
 syncChrome();
