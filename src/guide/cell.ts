@@ -75,20 +75,24 @@ export class GuideCell {
   }
 }
 
-/** Draw a guide hand from a timeline state; (x, y) is the middle of the hand as a share of the cell. */
-export function drawGuideHand(g: CanvasRenderingContext2D, w: number, h: number, s: State, tip: string, size = 0.5) {
+/** Landmark positions in cell pixels for a timeline state; (x, y) is the middle of the hand as a share of the cell. */
+export function handPoints(w: number, h: number, s: State, size = 0.5) {
   const pose = blendPose(OPEN_PALM, FIST, s.blend);
   const S = h * size * s.scale;
   const c = Math.cos(s.rotation);
   const n = Math.sin(s.rotation);
-  const pts = pose.map((p) => {
+  return pose.map((p) => {
     const lx = p.x - HAND_CENTER.x;
     const ly = p.y - HAND_CENTER.y;
     return { x: s.x * w + (lx * c - ly * n) * S, y: s.y * h + (lx * n + ly * c) * S };
   });
+}
+
+/** Draw a guide hand from a timeline state. */
+export function drawGuideHand(g: CanvasRenderingContext2D, w: number, h: number, s: State, tip: string, size = 0.5) {
   g.save();
   g.globalAlpha = s.alpha;
-  drawSkeleton(g, pts, tip);
+  drawSkeleton(g, handPoints(w, h, s, size), tip);
   g.restore();
 }
 

@@ -1,9 +1,12 @@
 import type { HandSignals } from './hands';
 import type { Host } from './scene';
+import { guideLoop } from './guide/cell';
+import { buildHelpCard, type HelpCard } from './guide/card';
 import { drawSkeleton } from './skeleton';
 import { coverRect } from './view';
 
-const HELP_AUTO_MS = 6000;
+/** The help card opens by itself the first time a scene is shown, and closes after this long. */
+const HELP_AUTO_MS = 15000;
 const PREVIEW_IN_MS = 500;
 const PREVIEW_MIN_MS = 280;
 
@@ -27,7 +30,11 @@ export class Chrome {
   private dock = $('dock');
   private helpBtn = $<HTMLButtonElement>('help-btn');
   private card = $('help-card');
-  private cardText = $('help-text');
+  private body = $('help-body');
+  private closeBtn = $<HTMLButtonElement>('help-close');
+  private cards = new Map<string, HelpCard>();
+  private current: HelpCard | null = null;
+  private playing = false;
   private camBtn = $<HTMLButtonElement>('cam-btn');
   private status = $('dock-status');
 
@@ -40,7 +47,6 @@ export class Chrome {
   private auto = false;
   private suppressed = false;
   private autoTimer = 0;
-  private seen = new Set<string>();
   private reduced = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false;
 
   constructor(
@@ -75,11 +81,10 @@ export class Chrome {
     });
     window.addEventListener('keydown', (e) => {
       if (e.key !== 'Escape') return;
-      this.pinned = this.auto = false;
-      this.suppressed = true;
-      this.syncHelp();
+      this.closeHelp();
     });
 
+    this.closeBtn.addEventListener('click', () => this.closeHelp());
     host.onTrackingChange(() => this.sync());
     this.sync();
   }
@@ -94,11 +99,14 @@ export class Chrome {
 
   /** Called whenever a scene is shown; opens the help card by itself the first time per scene. */
   sceneShown(id: string, help: string) {
-    this.cardText.textContent = help;
+    let card = this.cards.get(id);
+    if (!card) this.cards.set(id, (card = buildHelpCard(id, help)));
+    this.current = card;
+    this.body.replaceChildren(card.el);
     window.clearTimeout(this.autoTimer);
     this.auto = false;
-    if (!this.seen.has(id)) {
-      this.seen.add(id);
+    this.playing = false;
+    if (!this.seenBefore(id)) {
       this.auto = true;
       this.autoTimer = window.setTimeout(() => {
         this.auto = false;
@@ -106,6 +114,28 @@ export class Chrome {
       }, HELP_AUTO_MS);
     }
     this.syncHelp();
+  }
+
+  /** True if this scene's card already opened by itself in this visit; marks it as seen. */
+  private seenBefore(id: string) {
+    const key = `help-seen:${id}`;
+    try {
+      if (sessionStorage.getItem(key)) return true;
+      sessionStorage.setItem(key, '1');
+    } catch {
+      // Storage can be blocked; then the card just opens each time.
+    }
+    return false;
+  }
+
+  /** Close the card (Esc, the x button) and give focus back to the "?" button. */
+  private closeHelp() {
+    const wasOpen = !this.card.hidden;
+    this.pinned = this.auto = false;
+    this.suppressed = true;
+    window.clearTimeout(this.autoTimer);
+    this.syncHelp();
+    if (wasOpen) this.helpBtn.focus({ preventScroll: true });
   }
 
   /** Screen rectangle of the preview, or of its small button when minimised; null with the camera off. */
@@ -165,6 +195,14 @@ export class Chrome {
     const open = this.visible && (this.pinned || this.auto || (this.hover && !this.suppressed));
     this.card.hidden = !open;
     this.helpBtn.setAttribute('aria-expanded', String(open));
+    // The guide animations run only while the card is open.
+    if (open && !this.playing && this.current) {
+      this.playing = true;
+      guideLoop.activate(this.current.cells);
+    } else if (!open && this.playing) {
+      this.playing = false;
+      guideLoop.deactivate();
+    }
   }
 
   /** Mirrored camera image with the hand skeleton, once per frame. */

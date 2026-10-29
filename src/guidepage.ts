@@ -1,4 +1,5 @@
 import { GuideCell, guideLoop } from './guide/cell';
+import { createCanvasCell } from './guide/canvascell';
 import { createMeshCells } from './guide/meshcells';
 import { blendPose, FIST, HAND_CENTER, OPEN_PALM, type Pose } from './guide/poses';
 import { drawSkeleton } from './skeleton';
@@ -19,6 +20,10 @@ export function showGuide() {
     cells.push(c);
     page.append(c.el);
   }
+
+  const canvasCell = createCanvasCell('Move your hands in front of the camera. Every fingertip draws a trail.');
+  cells.push(canvasCell);
+  page.append(canvasCell.el);
 
   // Pose sheet.
   const poses: [string, Pose][] = [
@@ -44,4 +49,6 @@ export function showGuide() {
     page.append(c.el);
   }
   guideLoop.activate(cells);
+  // For checks from the console: window.__guideCells[i].draw(t).
+  (window as unknown as { __guideCells: GuideCell[] }).__guideCells = cells;
 }
