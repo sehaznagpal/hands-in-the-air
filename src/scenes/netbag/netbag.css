@@ -10,7 +10,7 @@
 
 .nb-counter {
   position: absolute;
-  top: max(18px, env(safe-area-inset-top));
+  top: calc(var(--header-h) + 8px + env(safe-area-inset-top));
   left: max(22px, env(safe-area-inset-left));
   display: grid;
   grid-template-columns: auto auto;
@@ -52,7 +52,7 @@
 
 .nb-topright {
   position: absolute;
-  top: max(18px, env(safe-area-inset-top));
+  top: calc(var(--header-h) + 8px + env(safe-area-inset-top));
   right: max(18px, env(safe-area-inset-right));
   display: grid;
   justify-items: end;

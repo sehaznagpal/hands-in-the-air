@@ -10,6 +10,8 @@
 
   --font: ui-serif, Georgia, 'Times New Roman', serif;
   --mono: ui-monospace, Menlo, Consolas, monospace;
+  /* Height of the top row (wordmark and scene toggle); scene UI starts below it. */
+  --header-h: 52px;
 }
 
 * { box-sizing: border-box; }
@@ -83,8 +85,8 @@ button:focus-visible { outline: 3px solid var(--accent); outline-offset: 3px; }
 
 #toolbar {
   position: absolute;
-  top: max(12px, env(safe-area-inset-top));
-  left: max(12px, env(safe-area-inset-left));
+  top: calc(var(--header-h) + env(safe-area-inset-top));
+  right: max(12px, env(safe-area-inset-right));
   display: flex;
   gap: 8px;
 }
@@ -95,7 +97,7 @@ button:focus-visible { outline: 3px solid var(--accent); outline-offset: 3px; }
 .debug-panel {
   position: absolute;
   right: max(12px, env(safe-area-inset-right));
-  top: 130px;
+  top: calc(var(--header-h) + 60px);
   margin: 0;
   padding: 10px 12px;
   max-width: 60vw;
@@ -124,7 +126,7 @@ button:focus-visible { outline: 3px solid var(--accent); outline-offset: 3px; }
 
 #mock-badge {
   position: absolute;
-  top: max(12px, env(safe-area-inset-top));
+  bottom: max(12px, env(safe-area-inset-bottom));
   left: 50%;
   transform: translateX(-50%);
   padding: 0.25em 0.8em;
@@ -132,7 +134,58 @@ button:focus-visible { outline: 3px solid var(--accent); outline-offset: 3px; }
   color: var(--paper);
   background: var(--ink);
   border-radius: 999px;
+  white-space: nowrap;
   opacity: 0.75;
   pointer-events: none;
 }
 #mock-badge[hidden] { display: none; }
+
+/* App header: wordmark and the scene toggle, always visible above every scene. */
+#header {
+  position: absolute;
+  inset: 0 0 auto 0;
+  z-index: 20;
+  height: calc(var(--header-h) + env(safe-area-inset-top));
+  padding: env(safe-area-inset-top) max(12px, env(safe-area-inset-right)) 0 max(12px, env(safe-area-inset-left));
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+}
+#wordmark {
+  position: absolute;
+  left: max(14px, env(safe-area-inset-left));
+  font-size: 0.95rem;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  opacity: 0.85;
+}
+#scene-toggle {
+  display: inline-flex;
+  padding: 3px;
+  gap: 2px;
+  background: var(--paper);
+  border: 2px solid var(--ink);
+  border-radius: 999px;
+  pointer-events: auto;
+}
+.scene-option {
+  border: 0;
+  border-radius: 999px;
+  padding: 0.38em 1em;
+  font-size: 0.85rem;
+  white-space: nowrap;
+  color: var(--ink);
+  background: transparent;
+}
+.scene-option:hover { background: color-mix(in srgb, var(--ink) 12%, transparent); color: var(--ink); }
+.scene-option[aria-checked='true'] { background: var(--ink); color: var(--paper); }
+.scene-option:focus-visible { outline: 3px solid var(--accent); outline-offset: 1px; }
+@media (max-width: 480px) {
+  #wordmark { font-size: 0.8rem; left: 10px; }
+  .scene-option { padding: 0.38em 0.8em; font-size: 0.8rem; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { transition: none !important; animation: none !important; scroll-behavior: auto !important; }
+}

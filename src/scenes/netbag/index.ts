@@ -13,9 +13,12 @@ const RELEASE_MODE: 'stay' | 'home' = 'stay';
 const MAX_CHANGES_PER_SEC = 6;
 const FIT_HEIGHT = 0.8;
 const FIT_WIDTH = 0.7;
-const FIT_EASE_SECONDS = 0.2; // time constant: about 600 ms to settle
+// Time constant: about 600 ms to settle, or nearly instant with reduced motion.
+const FIT_EASE_SECONDS = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ? 0.03 : 0.2;
 const HOME = { x: 0.5, y: 0.1 };
 const POP_SECONDS = 0.25;
+/** Keep the hanger clear of the app header. */
+const HEADER_PX = 56;
 
 interface Ghost {
   ball: Ball;
@@ -93,6 +96,8 @@ export class NetBagScene implements Scene {
       return error;
     });
     this.cleanup.push(() => this.handsUI.dispose());
+    // The camera is shared: if it is already on (started in another scene), hands are on.
+    if (ctx.host.tracking) this.setHands(true);
     this.cleanup.push(
       ctx.host.onTrackingChange((tracking) => {
         if (!tracking) this.setHands(false);
@@ -305,9 +310,9 @@ export class NetBagScene implements Scene {
     }
 
     // Hook goal in screen space, kept where the whole bag stays on screen.
-    const maxY = Math.max(0.04 * height, 0.97 * height - this.reach() * this.scale);
+    const maxY = Math.max(HEADER_PX, 0.04 * height, 0.97 * height - this.reach() * this.scale);
     const gx = Math.min(0.88 * width, Math.max(0.12 * width, this.goal.x * width));
-    const gy = Math.min(maxY, Math.max(0.04 * height, this.goal.y * height));
+    const gy = Math.min(maxY, Math.max(Math.max(0.04 * height, HEADER_PX), this.goal.y * height));
     world.setHookTarget((gx - this.offset.x) / this.scale, (gy - this.offset.y) / this.scale);
     world.advance(dt);
 

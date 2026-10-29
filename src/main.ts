@@ -3,7 +3,7 @@ import { DebugOverlay } from './debug';
 import { HandSignals } from './hands';
 import { MockHands } from './mock';
 import type { Host, Scene, SceneContext } from './scene';
-import { scenes } from './scenes';
+import { DEFAULT_SCENE, scenes } from './scenes';
 import { createTracker, ModelError, type HandTracker } from './tracker';
 import { coverRect } from './view';
 
@@ -142,10 +142,10 @@ function setScene(index: number) {
   overlay.replaceChildren();
   sceneIndex = index;
   scene = scenes[index].create();
-  // A scene with its own camera switch starts with tracking off.
-  if (scene.ownsCameraUI && tracking) host.stopTracking();
+  // The camera is shared by all scenes: switching never starts or stops it.
   scene.init(sceneCtx);
   menu.value = scenes[index].id;
+  syncToggle();
   syncChrome();
   if (host.mock && !scene.ownsCameraUI && !tracking) void host.startTracking();
 }
@@ -158,6 +158,59 @@ function syncChrome() {
   badge.hidden = !host.mock;
 }
 
+// ------------------------------------------------- scene toggle and routing
+
+const toggle = $('scene-toggle');
+const toggleButtons = scenes.map((s, i) => {
+  const b = document.createElement('button');
+  b.type = 'button';
+  b.className = 'scene-option';
+  b.textContent = s.name;
+  b.setAttribute('role', 'radio');
+  b.addEventListener('click', () => go(i));
+  toggle.appendChild(b);
+  return b;
+});
+
+function syncToggle() {
+  toggleButtons.forEach((b, i) => {
+    const on = i === sceneIndex;
+    b.setAttribute('aria-checked', String(on));
+    b.tabIndex = on ? 0 : -1;
+  });
+}
+
+/** Scene to show for the current URL: hash first, then ?scene=, then the default. */
+function sceneFromUrl() {
+  const hash = location.hash.replace(/^#\/?/, '').toLowerCase();
+  let i = scenes.findIndex((s) => s.hash === hash);
+  if (i < 0) i = scenes.findIndex((s) => s.id === params.get('scene'));
+  return i >= 0 ? i : scenes.findIndex((s) => s.id === DEFAULT_SCENE);
+}
+
+/** Changing the hash adds a history entry, so back and forward just work. */
+function go(index: number) {
+  const target = '#' + scenes[index].hash;
+  if (location.hash === target) setScene(index);
+  else location.hash = target;
+}
+
+window.addEventListener('hashchange', () => setScene(sceneFromUrl()));
+
+toggle.addEventListener('keydown', (e) => {
+  const n = scenes.length;
+  let next = -1;
+  if (e.key === 'ArrowRight' || e.key === 'ArrowDown') next = (sceneIndex + 1) % n;
+  else if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') next = (sceneIndex - 1 + n) % n;
+  else if (e.key === 'Home') next = 0;
+  else if (e.key === 'End') next = n - 1;
+  if (next < 0) return;
+  e.preventDefault();
+  e.stopPropagation(); // scenes use the arrow keys too
+  go(next);
+  toggleButtons[next].focus();
+});
+
 // Hidden dev menu: press ` to show.
 const menu = document.createElement('select');
 menu.className = 'dev-menu';
@@ -165,7 +218,7 @@ menu.hidden = true;
 menu.setAttribute('aria-label', 'Scene');
 for (const s of scenes) menu.add(new Option(s.name, s.id));
 menu.addEventListener('change', () => {
-  setScene(scenes.findIndex((s) => s.id === menu.value));
+  go(scenes.findIndex((s) => s.id === menu.value));
   menu.blur();
 });
 app.appendChild(menu);
@@ -240,7 +293,7 @@ window.addEventListener('keydown', (e) => {
   if (e.target instanceof HTMLSelectElement || e.metaKey || e.ctrlKey || e.altKey) return;
   if (e.key === 'd' || e.key === 'D') debug.toggle();
   else if (e.key === '`') menu.hidden = !menu.hidden;
-  else if (e.key >= '1' && e.key <= '3') setScene(Number(e.key) - 1);
+  else if (e.key >= '1' && e.key <= '3' && Number(e.key) <= scenes.length) go(Number(e.key) - 1);
 });
 
 startBtn.addEventListener('click', async () => {
@@ -253,7 +306,6 @@ startBtn.addEventListener('click', async () => {
 stopBtn.addEventListener('click', () => host.stopTracking());
 window.addEventListener('pagehide', () => host.stopTracking());
 
-const wanted = scenes.findIndex((s) => s.id === params.get('scene'));
-setScene(wanted >= 0 ? wanted : 0);
+setScene(sceneFromUrl());
 lastFrame = performance.now();
 rafId = requestAnimationFrame(frame);

@@ -40,6 +40,9 @@ export interface Scene {
 
 export interface SceneEntry {
   id: string;
+  /** Label on the scene toggle. */
   name: string;
+  /** URL hash, e.g. #canvas. */
+  hash: string;
   create(): Scene;
 }

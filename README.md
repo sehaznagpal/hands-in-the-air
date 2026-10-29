@@ -17,12 +17,12 @@ npm test           # unit tests for the hand signals
 npm run build      # static output in dist/ (works on Vercel as-is)
 ```
 
-Click **Start camera**. No camera? Open `/?mock=1` for two simulated hands.
+The app is called Hand Lab. Routes: `#netbag` (the default, works without a camera) and `#canvas` (Hand Canvas, needs the camera; click **Start camera**). The camera is shared, so switching scenes never restarts it. No camera? Open `/?mock=1` for two simulated hands.
 
 | Key | Action |
 | --- | --- |
 | `D` | Debug overlay: skeleton, fingertip ids 1-10, FPS, detection time, live signals |
-| `1` `2` `3` | Switch scene |
+| `1` `2` `3` | Switch scene (also the toggle at the top centre; arrow keys work inside it) |
 | `` ` `` | Hidden dev menu (scene picker). `?scene=<id>` also works |
 
 ## Theme
