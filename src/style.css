@@ -102,3 +102,17 @@ button:focus-visible { outline: 3px solid var(--accent); outline-offset: 3px; }
   white-space: pre-wrap;
 }
 .debug-panel[hidden] { display: none; }
+
+.dev-menu {
+  position: absolute;
+  left: 50%;
+  bottom: max(12px, env(safe-area-inset-bottom));
+  transform: translateX(-50%);
+  font: inherit;
+  padding: 0.3em 0.6em;
+  color: var(--ink);
+  background: var(--paper);
+  border: 2px solid var(--ink);
+  border-radius: 8px;
+}
+.dev-menu[hidden] { display: none; }
