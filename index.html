@@ -15,12 +15,21 @@
 
       <nav id="scene-toggle" role="radiogroup" aria-label="Scene"></nav>
 
-      <section id="intro">
-        <h1>Hand Canvas</h1>
-        <p class="lede">Move your hands in front of the camera and watch them draw.</p>
-        <button id="start" type="button">Start camera</button>
-        <p id="message" role="status" aria-live="polite"></p>
-        <p class="privacy">Your camera stays on your device.</p>
+      <section id="intro" aria-labelledby="welcome-title">
+        <div class="welcome-main">
+          <h1 id="welcome-title">
+            <span>WELCOME TO</span>
+            <span class="hand-slot" aria-hidden="true">
+              <span class="hand-sway"><span class="hand-flip"><img src="/src/assets/hand-flowers.png" alt="" width="848" height="1264" /></span></span>
+            </span>
+            <span>LAB.</span>
+          </h1>
+          <button id="start" class="welcome-start" type="button">Start your camera to begin</button>
+          <p id="message" role="status" aria-live="polite"></p>
+          <button id="use-mouse" class="welcome-link" type="button">or use your mouse</button>
+        </div>
+        <p class="welcome-foot-left">throw your hands in the air<br />to do random cool things.</p>
+        <p class="welcome-foot-right">by sehaz nagpal</p>
       </section>
 
       <div id="mock-badge" hidden>Simulated hands (?mock=1)</div>

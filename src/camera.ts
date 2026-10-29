@@ -10,7 +10,7 @@ export class CameraError extends Error {
 }
 
 export const CAMERA_MESSAGES: Record<CameraErrorKind, string> = {
-  denied: 'Camera permission was denied. Allow camera access in your browser settings and try again.',
+  denied: 'Camera blocked. Allow it in your browser, then try again.',
   none: 'No camera was found. Connect one, or add ?mock=1 to the address to try simulated hands.',
   unsupported: 'This browser cannot access a camera here. Use a current browser over https or localhost.',
   other: 'The camera could not be started. Close other apps that use it and try again.',

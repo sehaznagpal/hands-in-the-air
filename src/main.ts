@@ -14,6 +14,7 @@ const intro = $('intro');
 const startBtn = $<HTMLButtonElement>('start');
 const stopBtn = $<HTMLButtonElement>('stop');
 const toolbar = $('toolbar');
+const useMouseBtn = $<HTMLButtonElement>('use-mouse');
 const message = $('message');
 const overlay = $('overlay');
 const app = $('app');
@@ -21,6 +22,7 @@ const badge = $('mock-badge');
 const g = canvas.getContext('2d')!;
 const debug = new DebugOverlay(app);
 const params = new URLSearchParams(location.search);
+const reduced = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false;
 
 // ------------------------------------------------------------------- sizing
 
@@ -153,8 +155,28 @@ function setScene(index: number) {
   syncChrome();
 }
 
+function showWelcome() {
+  scene?.dispose();
+  scene = null;
+  sceneIndex = -1;
+  overlay.replaceChildren();
+  welcome = true;
+  intro.hidden = false;
+  intro.classList.remove('leaving');
+  syncChrome();
+}
+
+/** Fade the welcome screen out (500 ms) and hand over to the scene. */
+function leaveWelcome() {
+  welcome = false;
+  intro.classList.add('leaving');
+  window.setTimeout(() => {
+    if (!welcome) intro.hidden = true;
+  }, reduced ? 0 : 500);
+  syncChrome();
+}
+
 function syncChrome() {
-  intro.hidden = !welcome;
   toolbar.hidden = welcome || !tracking;
   badge.hidden = !host.mock || welcome;
   syncToggle();
@@ -211,17 +233,18 @@ function replaceHash(index: number) {
 
 /** Leave the welcome screen for the scene in the URL (or the default one). */
 function enterScenes() {
-  welcome = false;
   const i = sceneFromUrl() >= 0 ? sceneFromUrl() : defaultScene();
   replaceHash(i);
   setScene(i);
-  syncChrome();
+  leaveWelcome();
 }
 
 window.addEventListener('hashchange', () => {
   const i = sceneFromUrl();
   if (welcome || i < 0) return;
-  setScene(i);
+  // Without the camera only Mesh Bag works; the other scenes send the visitor back to the start.
+  if (!unlocked && scenes[i].id !== 'mesh') showWelcome();
+  else setScene(i);
 });
 
 toggle.addEventListener('keydown', (e) => {
@@ -326,14 +349,26 @@ window.addEventListener('keydown', (e) => {
 
 startBtn.addEventListener('click', async () => {
   startBtn.disabled = true;
-  message.textContent = 'Starting camera and loading the hand model…';
+  startBtn.textContent = 'Starting…';
+  message.textContent = '';
   const error = await host.startTracking();
-  message.textContent = error ?? '';
   startBtn.disabled = false;
-  if (!error) {
-    unlocked = true;
-    enterScenes();
+  if (error) {
+    startBtn.textContent = 'Try again';
+    message.textContent = error;
+    return;
   }
+  startBtn.textContent = 'Start your camera to begin';
+  unlocked = true;
+  enterScenes();
+});
+
+/** Mouse and keyboard only: Mesh Bag without a camera, toggle stays disabled. */
+useMouseBtn.addEventListener('click', () => {
+  const i = scenes.findIndex((s) => s.id === 'mesh');
+  replaceHash(i);
+  setScene(i);
+  leaveWelcome();
 });
 stopBtn.addEventListener('click', () => host.stopTracking());
 window.addEventListener('pagehide', () => host.stopTracking());
