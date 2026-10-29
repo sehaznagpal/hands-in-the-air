@@ -61,7 +61,7 @@ const trackingListeners = new Set<(on: boolean) => void>();
 const aspect = () => (video.videoWidth && video.videoHeight ? video.videoWidth / video.videoHeight : 16 / 9);
 
 const host: Host = {
-  mock: params.get('mock') === '1',
+  mock: params.get('mock') === '1' || params.get('mock') === 'idle',
   get tracking() {
     return tracking;
   },
@@ -307,7 +307,8 @@ function frame(now: number) {
     detectMs += (performance.now() - t0 - detectMs) * 0.1;
   } else if (host.mock && tracking && now / 1000 - lastMockT >= MOCK_FRAME) {
     lastMockT = now / 1000;
-    detected = mockHands.sample(now / 1000);
+    // ?mock=idle shows the simulated camera with no hands in it, for layout checks.
+    detected = params.get('mock') === 'idle' ? [] : mockHands.sample(now / 1000);
   }
   signals.update(detected, now / 1000, aspect());
 

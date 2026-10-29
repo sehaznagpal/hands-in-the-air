@@ -37,12 +37,12 @@ export class CanvasScene implements Scene {
 
   draw(g: CanvasRenderingContext2D) {
     const css = getComputedStyle(document.documentElement);
-    const ink = css.getPropertyValue('--ink').trim();
+    const blue = css.getPropertyValue('--blue').trim();
     const accent = css.getPropertyValue('--orange').trim();
     g.lineCap = 'round';
     g.lineJoin = 'round';
     for (const [id, trail] of this.trails) {
-      g.strokeStyle = id <= 5 ? ink : accent;
+      g.strokeStyle = id <= 5 ? blue : accent;
       for (let i = 1; i < trail.length; i++) {
         const life = 1 - (this.time - trail[i].t) / TRAIL_SECONDS;
         g.globalAlpha = Math.max(0, life) * 0.7;
@@ -55,7 +55,7 @@ export class CanvasScene implements Scene {
     }
     g.globalAlpha = 1;
     for (const tip of this.tips) {
-      g.fillStyle = tip.id <= 5 ? ink : accent;
+      g.fillStyle = tip.id <= 5 ? blue : accent;
       g.beginPath();
       g.arc(tip.x, tip.y, 11, 0, Math.PI * 2);
       g.fill();

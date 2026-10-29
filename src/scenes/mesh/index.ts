@@ -10,14 +10,22 @@ import { getSprites, type BallSet } from './sprites';
 const RELEASE_MODE: 'stay' | 'home' = 'stay';
 /** Count changes per second at most. */
 const MAX_CHANGES_PER_SEC = 6;
-const FIT_HEIGHT = 0.8;
-const FIT_WIDTH = 0.7;
+/** How much of the free area the bag may fill. */
+const FIT_HEIGHT = 0.95;
+const FIT_WIDTH = 0.85;
+/** Space kept between the bag and the left cluster, the preview and the toggle. */
+const GAP = 24;
 // Time constant: about 600 ms to settle, or nearly instant with reduced motion.
 const FIT_EASE_SECONDS = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ? 0.03 : 0.2;
 const HOME = { x: 0.5, y: 0.1 };
+
+interface Box {
+  left: number;
+  top: number;
+  right: number;
+  bottom: number;
+}
 const POP_SECONDS = 0.25;
-/** Keep the hanger clear of the app header. */
-const HEADER_PX = 56;
 
 interface Ghost {
   ball: Ball;
@@ -52,6 +60,7 @@ export class MeshScene implements Scene {
   /** Where the user wants the hook, as a fraction of the viewport. */
   private goal = { ...HOME };
   private lastSize = { w: 0, h: 0 };
+  private box: Box = { left: 0, top: 0, right: 1, bottom: 1 };
 
   private drag: { pointerId: number; dx: number; dy: number } | null = null;
   private wheelAcc = 0;
@@ -61,7 +70,9 @@ export class MeshScene implements Scene {
   private handsOn = false;
 
   private countEl!: HTMLElement;
-  private labelEl!: HTMLElement;
+  private cluster!: HTMLElement;
+  /** False until the user moves the bag; until then it stays centred in the free area. */
+  private moved = false;
   private setButtons: Record<BallSet, HTMLButtonElement> | null = null;
 
   init(ctx: SceneContext) {
@@ -92,10 +103,10 @@ export class MeshScene implements Scene {
 
   private buildUI() {
     const root = this.ctx.overlay;
-    const counter = el('div', 'mesh-counter');
+    const cluster = el('div', 'mesh-cluster');
+    this.cluster = cluster;
     this.countEl = el('div', 'mesh-count', '0');
     this.countEl.setAttribute('aria-live', 'polite');
-    this.labelEl = el('div', 'mesh-label', 'balls');
     const minus = el('button', 'mesh-step', '−');
     minus.type = 'button';
     minus.setAttribute('aria-label', 'Remove one');
@@ -110,22 +121,21 @@ export class MeshScene implements Scene {
     const sets = el('div', 'mesh-sets');
     sets.setAttribute('role', 'group');
     sets.setAttribute('aria-label', 'Ball set (M)');
-    const marbles = el('button', 'mesh-set', 'marbles');
-    const fruit = el('button', 'mesh-set', 'fruit');
+    const marbles = el('button', 'pill small', 'marbles');
+    const fruit = el('button', 'pill small', 'fruits');
     marbles.type = fruit.type = 'button';
     marbles.addEventListener('click', () => this.chooseSet('marbles'));
     fruit.addEventListener('click', () => this.chooseSet('fruit'));
     sets.append(marbles, fruit);
     this.setButtons = { marbles, fruit };
 
-    counter.append(this.countEl, this.labelEl, steps, sets);
-    root.append(counter);
+    cluster.append(this.countEl, steps, sets);
+    root.append(cluster);
     this.refreshUI();
   }
 
   private refreshUI() {
     this.countEl.textContent = String(this.target);
-    this.labelEl.textContent = this.set === 'marbles' ? 'balls' : 'fruit';
     if (this.setButtons) {
       for (const key of ['marbles', 'fruit'] as const) {
         this.setButtons[key].setAttribute('aria-pressed', String(this.set === key));
@@ -177,6 +187,7 @@ export class MeshScene implements Scene {
       if (this.drag || !this.nearHanger(e.offsetX, e.offsetY)) return;
       const hook = this.hookScreen();
       this.drag = { pointerId: e.pointerId, dx: e.offsetX - hook.x, dy: e.offsetY - hook.y };
+      this.moved = true;
       canvas.setPointerCapture(e.pointerId);
       canvas.style.cursor = 'grabbing';
     });
@@ -229,19 +240,54 @@ export class MeshScene implements Scene {
     return r + BALL_R * 1.2;
   }
 
-  private fitScale() {
+  /**
+   * The free area for the bag: right of the left cluster and clear of the camera preview,
+   * either left of it or above it, whichever lets the bag be larger.
+   */
+  private freeBox(): Box {
     const { width, height } = this.ctx.size;
+    const edge = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--edge')) || 48;
+    const toggle = document.getElementById('scene-toggle')?.getBoundingClientRect();
+    const top = (toggle ? toggle.bottom : 88) + 16;
+    const bottom = height - Math.min(edge, 24);
+    const left = this.cluster.getBoundingClientRect().right + GAP;
+    // On wide screens the box is symmetric, so the bag sits in the middle when nothing else is there.
+    const right = width > 640 ? width - left : width - edge;
+    const full = { left, top, right, bottom };
+    const pv = this.ctx.previewRect();
+    if (!pv) return full;
+    const beside = { ...full, right: Math.min(right, pv.left - GAP) };
+    const above = { ...full, bottom: Math.min(bottom, pv.top - GAP) };
+    return this.fitScaleIn(beside) >= this.fitScaleIn(above) ? beside : above;
+  }
+
+  private fitScaleIn(box: Box) {
     const bagW = this.world.width() + 2 * BALL_R;
-    return Math.max(8, Math.min(58, (FIT_HEIGHT * height) / this.reach(), (FIT_WIDTH * width) / bagW));
+    const h = Math.max(1, box.bottom - box.top);
+    const w = Math.max(1, box.right - box.left);
+    return Math.max(8, Math.min(58, (FIT_HEIGHT * h) / this.reach(), (FIT_WIDTH * w) / bagW));
+  }
+
+  private fitScale() {
+    return this.fitScaleIn(this.box);
   }
 
   /** Snap the view without easing. */
   private fitNow() {
     const { width, height } = this.ctx.size;
+    this.box = this.freeBox();
+    this.goHome();
     this.scale = this.fitScale();
     this.offset.x = this.goal.x * width - this.world.hook.x * this.scale;
     this.offset.y = this.goal.y * height - this.world.hook.y * this.scale;
     this.lastSize = { w: width, h: height };
+  }
+
+  /** Hook goal that puts the bag in the middle of the free area, hanger at its top. */
+  private goHome() {
+    const { width, height } = this.ctx.size;
+    this.goal.x = (this.box.left + this.box.right) / 2 / width;
+    this.goal.y = this.box.top / height;
   }
 
   // ------------------------------------------------------------ update
@@ -255,6 +301,7 @@ export class MeshScene implements Scene {
       const { dial, grab } = this.controller;
       if (dial.active) this.setTarget(stepDial(this.target, dial.raw));
       if (grab && !this.drag) {
+        this.moved = true;
         this.goal.x = grab.x;
         this.goal.y = grab.y;
       }
@@ -274,10 +321,15 @@ export class MeshScene implements Scene {
       }
     }
 
+    // Until the user moves the bag it stays centred in the free area (and follows the preview).
+    this.box = this.freeBox();
+    if (!this.moved) this.goHome();
+
     // Hook goal in screen space, kept where the whole bag stays on screen.
-    const maxY = Math.max(HEADER_PX, 0.04 * height, 0.97 * height - this.reach() * this.scale);
+    const minY = this.box.top;
+    const maxY = Math.max(minY, 0.97 * height - this.reach() * this.scale);
     const gx = Math.min(0.88 * width, Math.max(0.12 * width, this.goal.x * width));
-    const gy = Math.min(maxY, Math.max(Math.max(0.04 * height, HEADER_PX), this.goal.y * height));
+    const gy = Math.min(maxY, Math.max(minY, this.goal.y * height));
     world.setHookTarget((gx - this.offset.x) / this.scale, (gy - this.offset.y) / this.scale);
     world.advance(dt);
 
@@ -303,13 +355,13 @@ export class MeshScene implements Scene {
 
   draw(g: CanvasRenderingContext2D) {
     const { width, height, dpr } = this.ctx.size;
-    g.fillStyle = cssVar('--mesh-paper') || '#E9E2D3';
+    g.fillStyle = cssVar('--bg') || '#dad1ca';
     g.fillRect(0, 0, width, height);
 
     g.save();
     g.setTransform(dpr * this.scale, 0, 0, dpr * this.scale, dpr * this.offset.x, dpr * this.offset.y);
     for (const b of this.world.balls) drawBall(g, b, this.sprites, BALL_R * b.scale);
-    drawMesh(g, this.world, cssVar('--mesh-line') || '#F26A1B', 3 / this.scale);
+    drawMesh(g, this.world, cssVar('--orange') || '#c54812', 3 / this.scale);
     for (const gh of this.ghosts) {
       const k = gh.age / POP_SECONDS;
       drawBall(g, gh.ball, this.sprites, BALL_R * (1 + 0.15 * k), 1 - k);
