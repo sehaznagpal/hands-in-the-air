@@ -9,8 +9,21 @@
   </head>
   <body>
     <main id="app">
-      <h1>Hand Canvas</h1>
-      <p class="privacy">Your camera stays on your device.</p>
+      <canvas id="stage"></canvas>
+      <video id="video" playsinline muted aria-hidden="true"></video>
+      <div id="overlay"></div>
+
+      <section id="intro">
+        <h1>Hand Canvas</h1>
+        <p class="lede">Move your hands in front of the camera and watch them draw.</p>
+        <button id="start" type="button">Start camera</button>
+        <p id="message" role="status" aria-live="polite"></p>
+        <p class="privacy">Your camera stays on your device.</p>
+      </section>
+
+      <div id="toolbar" hidden>
+        <button id="stop" type="button">Stop camera</button>
+      </div>
     </main>
     <script type="module" src="/src/main.ts"></script>
   </body>
