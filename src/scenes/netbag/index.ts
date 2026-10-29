@@ -1,6 +1,8 @@
 import type { HandSignals } from '../../hands';
 import type { Scene, SceneContext } from '../../scene';
 import './netbag.css';
+import { HandController, dialY, stepDial, DIAL_BOTTOM, DIAL_TOP } from './handcontrol';
+import { HandsUI } from './handsui';
 import { BagWorld, MAX_BALLS, BALL_R, type Ball } from './physics';
 import { drawBall, drawNet } from './render';
 import { getSprites, type BallSet } from './sprites';
@@ -67,6 +69,10 @@ export class NetBagScene implements Scene {
   private wheelAcc = 0;
   private cleanup: (() => void)[] = [];
 
+  private controller = new HandController();
+  private handsUI!: HandsUI;
+  private handsOn = false;
+
   private countEl!: HTMLElement;
   private labelEl!: HTMLElement;
   private setButtons: Record<BallSet, HTMLButtonElement> | null = null;
@@ -76,6 +82,36 @@ export class NetBagScene implements Scene {
     this.buildUI();
     this.bindInput();
     this.fitNow();
+
+    this.handsUI = new HandsUI(ctx, async (on) => {
+      if (!on) {
+        ctx.host.stopTracking();
+        return null;
+      }
+      const error = await ctx.host.startTracking();
+      if (!error) this.setHands(true);
+      return error;
+    });
+    this.cleanup.push(() => this.handsUI.dispose());
+    this.cleanup.push(
+      ctx.host.onTrackingChange((tracking) => {
+        if (!tracking) this.setHands(false);
+      }),
+    );
+    // A fast open-hand swipe is a gust of wind.
+    this.cleanup.push(
+      ctx.hands.on('swipe', (e) => {
+        if (!this.handsOn || e.openness < 0.5) return;
+        const dir = e.direction === 'right' ? 1 : -1;
+        this.world.gust(dir * Math.min(16, 6 + 3 * e.speed));
+      }),
+    );
+  }
+
+  private setHands(on: boolean) {
+    this.handsOn = on;
+    if (!on) this.controller.reset();
+    this.handsUI.setOn(on);
   }
 
   // ----------------------------------------------------------------- UI
@@ -239,9 +275,20 @@ export class NetBagScene implements Scene {
 
   // ------------------------------------------------------------ update
 
-  update(_hands: HandSignals, dt: number) {
+  update(hands: HandSignals, dt: number) {
     const { width, height } = this.ctx.size;
     const world = this.world;
+
+    if (this.handsOn) {
+      this.controller.update(hands, dt);
+      const { dial, grab } = this.controller;
+      if (dial.active) this.setTarget(stepDial(this.target, dial.raw));
+      if (grab && !this.drag) {
+        this.goal.x = grab.x;
+        this.goal.y = grab.y;
+      }
+      this.handsUI.drawPreview(hands, this.controller);
+    }
 
     // Count changes, rate limited. A blocked mouth just retries next frame.
     this.changeTimer = Math.max(0, this.changeTimer - dt);
@@ -297,6 +344,53 @@ export class NetBagScene implements Scene {
       const k = gh.age / POP_SECONDS;
       drawBall(g, gh.ball, this.sprites, BALL_R * (1 + 0.15 * k), 1 - k);
     }
+    g.restore();
+    if (this.handsOn) this.drawRuler(g);
+  }
+
+  /** Vertical 0-25 ruler at the right edge: the marker follows the dialling hand. */
+  private drawRuler(g: CanvasRenderingContext2D) {
+    const { width, height } = this.ctx.size;
+    const ink = cssVar('--nb-ink') || '#1D1D1B';
+    const net = cssVar('--nb-net') || '#F26A1B';
+    const x = width - 26;
+    const y0 = DIAL_TOP * height;
+    const y1 = DIAL_BOTTOM * height;
+    const { dial } = this.controller;
+    const markerY = (dial.active ? Math.min(DIAL_BOTTOM, Math.max(DIAL_TOP, dial.y)) : dialY(this.target)) * height;
+
+    g.save();
+    g.strokeStyle = ink;
+    g.fillStyle = ink;
+    g.lineWidth = 1.5;
+    g.lineCap = 'round';
+    g.globalAlpha = 0.75;
+    g.beginPath();
+    g.moveTo(x, y0);
+    g.lineTo(x, y1);
+    for (let i = 0; i <= MAX_BALLS; i++) {
+      const y = y1 - ((y1 - y0) * i) / MAX_BALLS;
+      const len = i % 5 === 0 ? 12 : 6;
+      g.moveTo(x, y);
+      g.lineTo(x - len, y);
+    }
+    g.stroke();
+    g.font = '11px ui-monospace, Menlo, monospace';
+    g.textAlign = 'right';
+    g.textBaseline = 'middle';
+    for (let i = 0; i <= MAX_BALLS; i += 5) g.fillText(String(i), x - 18, y1 - ((y1 - y0) * i) / MAX_BALLS);
+
+    g.globalAlpha = dial.active ? 1 : 0.55;
+    g.fillStyle = net;
+    g.beginPath();
+    g.moveTo(x + 2, markerY);
+    g.lineTo(x - 14, markerY - 8);
+    g.lineTo(x - 14, markerY + 8);
+    g.closePath();
+    g.fill();
+    g.fillStyle = ink;
+    g.font = '600 22px ui-serif, Georgia, serif';
+    g.fillText(String(this.target), x - 50, markerY);
     g.restore();
   }
 

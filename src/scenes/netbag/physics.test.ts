@@ -131,6 +131,19 @@ describe('stress', () => {
     expect(w.sleeping).toBe(true);
   });
 
+  it('survives a long drop of the hook with a full bag', () => {
+    for (const [tx, ty] of [[0, 20], [-9, 20], [0, -6], [12, 12]]) {
+      const w = new BagWorld(() => 0.5);
+      fill(w, 25);
+      settle(w, 5);
+      w.setHookTarget(tx, ty);
+      settle(w, 12);
+      const poly = outline(w);
+      expect(w.balls.filter((b) => !inPolygon(poly, b.x, b.y)), `target ${tx},${ty}`).toHaveLength(0);
+      expect(w.sleeping).toBe(true);
+    }
+  });
+
   it('swings like a pendulum: the bottom lags the hook, then comes back', () => {
     const w = new BagWorld(() => 0.5);
     fill(w, 10);

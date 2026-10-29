@@ -95,7 +95,7 @@ button:focus-visible { outline: 3px solid var(--accent); outline-offset: 3px; }
 .debug-panel {
   position: absolute;
   right: max(12px, env(safe-area-inset-right));
-  top: max(12px, env(safe-area-inset-top));
+  top: 130px;
   margin: 0;
   padding: 10px 12px;
   max-width: 60vw;

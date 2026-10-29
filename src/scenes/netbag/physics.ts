@@ -60,6 +60,7 @@ export const TUNING = {
   hookOmega: 16,
   hookMaxSpeed: 40,
   hookMaxAccel: 140,
+  hookMaxDownAccel: 50,
   /** Speed below which (units/s) the bag may sleep. */
   sleepSpeed: 0.4,
   sleepAfter: 0.6,
@@ -247,13 +248,13 @@ export class BagWorld {
   private moveHook(h: number) {
     const T = TUNING;
     // Velocity-limited, acceleration-limited follow: a hand can jerk, the bag only feels a firm tug.
-    let wx = (this.hookTarget.x - this.hook.x) * T.hookOmega;
-    let wy = (this.hookTarget.y - this.hook.y) * T.hookOmega;
-    const wl = Math.hypot(wx, wy);
-    if (wl > T.hookMaxSpeed) {
-      wx *= T.hookMaxSpeed / wl;
-      wy *= T.hookMaxSpeed / wl;
-    }
+    const dx = this.hookTarget.x - this.hook.x;
+    const dy = this.hookTarget.y - this.hook.y;
+    const dist = Math.hypot(dx, dy);
+    // Fast enough to arrive, slow enough to brake in time, never above the speed limit.
+    const want = Math.min(T.hookMaxSpeed, dist * T.hookOmega, Math.sqrt(1.2 * T.hookMaxAccel * dist));
+    const wx = dist > 1e-9 ? (dx / dist) * want : 0;
+    const wy = dist > 1e-9 ? (dy / dist) * want : 0;
     let ax = wx - this.hookVel.x;
     let ay = wy - this.hookVel.y;
     const al = Math.hypot(ax, ay);
@@ -262,6 +263,8 @@ export class BagWorld {
       ax *= maxA / al;
       ay *= maxA / al;
     }
+    // Speeding up downward slower than gravity keeps the net taut, so the pile never crashes into the neck.
+    ay = Math.min(ay, T.hookMaxDownAccel * h);
     this.hookVel.x += ax;
     this.hookVel.y += ay;
     this.hook.x += this.hookVel.x * h;
