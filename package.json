@@ -1,0 +1,22 @@
+{
+  "name": "hand-canvas",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "setup:assets": "node scripts/copy-wasm.mjs",
+    "postinstall": "node scripts/copy-wasm.mjs",
+    "dev": "vite",
+    "build": "node scripts/copy-wasm.mjs && tsc --noEmit && vite build",
+    "preview": "vite preview",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@mediapipe/tasks-vision": "1.2.0"
+  },
+  "devDependencies": {
+    "typescript": "5.9.3",
+    "vite": "7.3.7",
+    "vitest": "4.1.12"
+  }
+}

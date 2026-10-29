@@ -1,0 +1,27 @@
+:root {
+  --paper: #f1ead8;
+  --ink: #1f1b16;
+  --accent: #d2452b;
+  --font: ui-serif, Georgia, 'Times New Roman', serif;
+}
+
+* { box-sizing: border-box; }
+
+html, body {
+  margin: 0;
+  height: 100%;
+  overflow: hidden;
+  background: var(--paper);
+  color: var(--ink);
+  font-family: var(--font);
+}
+
+#app {
+  height: 100dvh;
+  display: grid;
+  place-content: center;
+  text-align: center;
+  gap: 0.5rem;
+}
+
+.privacy { margin: 0; font-size: 0.85rem; opacity: 0.7; }
