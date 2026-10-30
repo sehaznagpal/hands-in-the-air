@@ -1,4 +1,4 @@
-import { STYLES, renderMarble } from './scenes/mesh/marbles';
+import { STYLES, renderMarble } from './shared/marbles';
 
 /** All 12 marble styles at large size, 4 by 3, labelled 0 to 11, on the page background. */
 export function showSheet() {

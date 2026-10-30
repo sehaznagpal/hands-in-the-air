@@ -1,6 +1,7 @@
 import type { GuideCell } from './cell';
 import { createCanvasCell } from './canvascell';
 import { createMeshCells } from './meshcells';
+import { createSortCells } from './sortcells';
 import { createWindowCells } from './windowcells';
 
 export interface HelpCard {
@@ -33,6 +34,22 @@ export function buildHelpCard(sceneId: string, fallback: string): HelpCard {
     note.textContent = 'No camera? Drag the mesh with your mouse and use the arrow keys for the number.';
     note.setAttribute('aria-hidden', 'true');
     el.append(srOnly(MESH_SR), grid, note);
+    return { el, cells };
+  }
+  if (sceneId === 'sort') {
+    const cells = createSortCells();
+    const grid = document.createElement('div');
+    grid.className = 'guide-grid three';
+    grid.append(...cells.map((c) => c.el));
+    const note = document.createElement('p');
+    note.className = 'guide-note';
+    note.textContent = 'No camera? Drag marbles with your mouse.';
+    note.setAttribute('aria-hidden', 'true');
+    el.append(
+      srOnly('Pinch your thumb and index finger to pick up a marble. Move it and let go on the matching shelf. Missed marbles cost a life. No camera? Drag marbles with your mouse.'),
+      grid,
+      note,
+    );
     return { el, cells };
   }
   if (sceneId === 'window') {

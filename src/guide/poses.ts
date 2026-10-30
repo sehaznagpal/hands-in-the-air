@@ -34,6 +34,12 @@ export const FIST: Pose = P([
 /** One finger pointing: the index stays long, the rest curl as in the fist. */
 export const POINT: Pose = FIST.map((p, i) => (i >= 5 && i <= 8 ? OPEN_PALM[i] : p));
 
+/** Thumb and index tips together: a pinch. The other fingers stay open. */
+export const PINCH: Pose = OPEN_PALM.map((p, i) => {
+  const pinch: Record<number, number[]> = { 2: [-0.3, -0.27], 3: [-0.28, -0.5], 4: [-0.23, -0.72], 6: [-0.2, -0.6], 7: [-0.2, -0.69], 8: [-0.21, -0.74] };
+  return pinch[i] ? { x: pinch[i][0] * 1.3, y: pinch[i][1] } : p;
+});
+
 /** Every landmark moves linearly from a to b. */
 export function blendPose(a: Pose, b: Pose, t: number): Pose {
   return a.map((p, i) => ({ x: p.x + (b[i].x - p.x) * t, y: p.y + (b[i].y - p.y) * t }));

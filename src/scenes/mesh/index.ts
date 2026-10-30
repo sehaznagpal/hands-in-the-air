@@ -5,7 +5,7 @@ import { DialDriver, HandController, smoothToward } from './handcontrol';
 import { BagWorld, MAX_BALLS, BALL_R, type Ball } from './physics';
 import { drawBall, drawMesh } from './render';
 import { TUNING } from './tuning';
-import { MarbleRenderer } from './marbles';
+import { MarbleRenderer } from '../../shared/marbles';
 import { getSprites, type BallSet } from './sprites';
 
 /** What happens to the hook when released. 'stay' keeps it; 'home' springs back to the top centre. */

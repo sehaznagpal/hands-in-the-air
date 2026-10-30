@@ -1,6 +1,6 @@
 import { GuideCell, drawGuideHand, handPoints } from '../guide/cell';
 import { at, miniMesh } from '../guide/meshcells';
-import { renderMarble, type MarbleLayers } from '../scenes/mesh/marbles';
+import { renderMarble, type MarbleLayers } from '../shared/marbles';
 import { Timeline, type State } from '../guide/timeline';
 
 const css = (name: string, fallback: string) => getComputedStyle(document.documentElement).getPropertyValue(name).trim() || fallback;

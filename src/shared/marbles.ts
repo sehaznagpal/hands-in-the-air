@@ -473,8 +473,9 @@ export class MarbleRenderer {
     return l;
   }
 
-  draw(g: CanvasRenderingContext2D, ball: BallLike, radius: number, alpha: number, d: number) {
-    const l = this.get(marbleStyleFor(ball.id), d);
+  /** `style` picks one of the 12 styles directly; without it the ball id chooses. */
+  draw(g: CanvasRenderingContext2D, ball: BallLike, radius: number, alpha: number, d: number, style?: number) {
+    const l = this.get(style ?? marbleStyleFor(ball.id), d);
     const r = (radius * l.size) / (l.size - 3);
     g.save();
     g.globalAlpha = alpha;

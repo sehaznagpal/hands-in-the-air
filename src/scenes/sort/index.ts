@@ -1,0 +1,365 @@
+import type { HandSignals } from '../../hands';
+import type { Scene, SceneContext } from '../../scene';
+import { MarbleRenderer } from '../../shared/marbles';
+import { FAMILIES, SortGame, TUNING, type Marble } from './game';
+
+const BEST_KEY = 'sort-best';
+/** Colours of the three families, used for confetti and the pattern marks' backdrop. */
+const FAMILY_COLOR = ['#2f6fe0', '#e0549a', '#1fa38a'];
+
+const css = (name: string, fallback: string) => getComputedStyle(document.documentElement).getPropertyValue(name).trim() || fallback;
+
+/** A small white mark per family (dots, stripes, swirl) so the game works without telling colours apart. */
+export function familyMark(g: CanvasRenderingContext2D, family: number, x: number, y: number, r: number, alpha = 1) {
+  g.save();
+  g.translate(x, y);
+  g.globalAlpha = alpha;
+  g.strokeStyle = g.fillStyle = 'rgba(255,255,255,0.96)';
+  g.shadowColor = 'rgba(0,0,0,0.5)';
+  g.shadowBlur = 2;
+  g.lineWidth = Math.max(1.5, r * 0.11);
+  g.lineCap = 'round';
+  g.beginPath();
+  if (family === 0) {
+    for (const [dx, dy] of [[0, -0.3], [-0.28, 0.2], [0.28, 0.2]]) {
+      g.moveTo(dx * r + r * 0.12, dy * r);
+      g.arc(dx * r, dy * r, r * 0.12, 0, Math.PI * 2);
+    }
+    g.fill();
+  } else if (family === 1) {
+    for (let k = -1; k <= 1; k++) {
+      g.moveTo(-0.32 * r + k * 0.3 * r, 0.4 * r);
+      g.lineTo(0.12 * r + k * 0.3 * r, -0.4 * r);
+    }
+    g.stroke();
+  } else {
+    for (let a = 0; a <= Math.PI * 4; a += 0.2) {
+      const rad = r * (0.06 + a * 0.032);
+      const px = Math.cos(a) * rad;
+      const py = Math.sin(a) * rad;
+      if (a === 0) g.moveTo(px, py);
+      else g.lineTo(px, py);
+    }
+    g.stroke();
+  }
+  g.restore();
+}
+
+interface Hand {
+  down: boolean;
+  lost: number;
+  point: { x: number; y: number } | null;
+}
+
+/** Sort: pinch marbles out of the air and put each on the shelf of its colour family. */
+export class SortScene implements Scene {
+  readonly help = 'Pinch to pick up a marble, move it and let go on the matching shelf. Missed marbles cost a life.';
+
+  private ctx!: SceneContext;
+  private game = new SortGame();
+  private marbles = new MarbleRenderer();
+  private hands: Record<'L' | 'R', Hand> = { L: { down: false, lost: 0, point: null }, R: { down: false, lost: 0, point: null } };
+  private holder: 'L' | 'R' | 'mouse' | null = null;
+  private layoutKey = '';
+  private cleanup: (() => void)[] = [];
+  private orange = '#c84a12';
+  private blue = '#0a3699';
+
+  init(ctx: SceneContext) {
+    this.ctx = ctx;
+    this.orange = css('--orange', this.orange);
+    this.blue = css('--blue', this.blue);
+    this.game.best = this.loadBest();
+    this.game.onOver = (score) => this.saveBest(score);
+    this.layout();
+    this.bindInput();
+  }
+
+  private loadBest() {
+    try {
+      return Number(localStorage.getItem(BEST_KEY)) || 0;
+    } catch {
+      return 0;
+    }
+  }
+
+  private saveBest(score: number) {
+    try {
+      localStorage.setItem(BEST_KEY, String(Math.max(score, this.loadBest())));
+    } catch {
+      // Storage can be blocked; the best score then lasts only for this visit.
+    }
+  }
+
+  /** Shelves sit in the lower half, clear of the camera preview. */
+  private layout() {
+    const { width: W, height: H } = this.ctx.size;
+    const pv = this.ctx.previewRect();
+    const r = Math.max(15, Math.min(30, W * 0.026));
+    const toggle = document.getElementById('scene-toggle')?.getBoundingClientRect();
+    const topY = (toggle ? toggle.bottom : 88) + 62;
+    const shelfY = Math.max(H * 0.4, Math.min(H * 0.56, (pv && pv.width > 80 ? pv.top : H) - 3.6 * r - 14));
+    const key = `${W}|${H}|${Math.round(shelfY)}|${Math.round(topY)}`;
+    if (key === this.layoutKey) return;
+    this.layoutKey = key;
+    this.game.layout(W, H, shelfY, topY);
+  }
+
+  // --------------------------------------------------------------- input
+
+  private press(x: number, y: number, who: 'L' | 'R' | 'mouse') {
+    const game = this.game;
+    if (game.state !== 'play') {
+      if (game.ready) {
+        game.start();
+        this.holder = null;
+      }
+      return;
+    }
+    if (!game.held && game.grabAt(x, y)) this.holder = who;
+  }
+
+  private bindInput() {
+    const canvas = this.ctx.canvas;
+    const on = <T extends EventTarget>(t: T, type: string, fn: (e: never) => void) => {
+      t.addEventListener(type, fn as EventListener);
+      this.cleanup.push(() => t.removeEventListener(type, fn as EventListener));
+    };
+    on(canvas, 'pointerdown', (e: PointerEvent) => {
+      this.press(e.offsetX, e.offsetY, 'mouse');
+      if (this.holder === 'mouse') {
+        try {
+          canvas.setPointerCapture(e.pointerId);
+        } catch {
+          // Not a live pointer (for example a synthetic event); dragging still works inside the canvas.
+        }
+      }
+    });
+    on(canvas, 'pointermove', (e: PointerEvent) => {
+      if (this.holder === 'mouse') this.game.moveHeld(e.offsetX, e.offsetY);
+    });
+    const up = () => {
+      if (this.holder === 'mouse') {
+        this.game.release();
+        this.holder = null;
+      }
+    };
+    on(canvas, 'pointerup', up);
+    on(canvas, 'pointercancel', up);
+  }
+
+  /** A pinch near a marble grabs it, it follows the pinch point, and opening the fingers lets go. */
+  private readHands(hands: HandSignals, dt: number) {
+    for (const [key, side] of [['L', hands.left], ['R', hands.right]] as const) {
+      const st = side.state;
+      const h = this.hands[key];
+      h.point = null;
+      if (st.present && st.landmarks.length > 8) {
+        const a = st.landmarks[4];
+        const b = st.landmarks[8];
+        h.point = this.ctx.toScreen((a.x + b.x) / 2, (a.y + b.y) / 2);
+      }
+      const pinching = !!h.point && st.pinching;
+      if (pinching && h.point) {
+        h.lost = 0;
+        if (!h.down) this.press(h.point.x, h.point.y, key);
+        else if (this.holder === key) this.game.moveHeld(h.point.x, h.point.y);
+        h.down = true;
+      } else {
+        if (this.holder === key) {
+          h.lost += dt;
+          if (h.lost >= TUNING.PINCH_RELEASE_GRACE) {
+            this.game.release();
+            this.holder = null;
+          }
+        }
+        if (this.holder !== key) h.down = false;
+      }
+    }
+  }
+
+  // ------------------------------------------------------ update and draw
+
+  update(hands: HandSignals, dt: number) {
+    this.layout();
+    this.readHands(hands, dt);
+    this.marbles.tick(dt);
+    this.game.update(dt);
+  }
+
+  private drawMarble(g: CanvasRenderingContext2D, m: Marble, d: number) {
+    const r = this.game.r * m.scale;
+    if (r < 1) return;
+    this.marbles.draw(g, m, r, 1, d, m.style);
+    familyMark(g, m.family, m.x, m.y, r, m.scale);
+    if (m.mode === 'held') {
+      g.strokeStyle = this.orange;
+      g.lineWidth = 3;
+      g.beginPath();
+      g.arc(m.x, m.y, r + 4, 0, Math.PI * 2);
+      g.stroke();
+    }
+  }
+
+  draw(g: CanvasRenderingContext2D) {
+    const game = this.game;
+    const { width: W, height: H, dpr } = this.ctx.size;
+    const r = game.r;
+    const d = this.marbles.sizeFor(r, dpr);
+    g.lineCap = 'round';
+    g.lineJoin = 'round';
+
+    // Floor.
+    g.strokeStyle = this.orange;
+    g.globalAlpha = 0.4;
+    g.lineWidth = 2;
+    g.setLineDash([10, 8]);
+    g.beginPath();
+    g.moveTo(16, game.floorY);
+    g.lineTo(W - 16, game.floorY);
+    g.stroke();
+    g.setLineDash([]);
+    g.globalAlpha = 1;
+
+    // Chute at the top centre.
+    const cx = W / 2;
+    const cy = game.chuteY;
+    g.strokeStyle = this.orange;
+    g.lineWidth = 3;
+    g.beginPath();
+    g.moveTo(cx - 62, cy - 34);
+    g.lineTo(cx - 24, cy - 2);
+    g.moveTo(cx + 62, cy - 34);
+    g.lineTo(cx + 24, cy - 2);
+    g.moveTo(cx - 24, cy - 2);
+    g.lineTo(cx - 24, cy + 6);
+    g.moveTo(cx + 24, cy - 2);
+    g.lineTo(cx + 24, cy + 6);
+    g.stroke();
+
+    // Shelves, with a label marble and a pattern mark each.
+    game.shelves.forEach((s, k) => {
+      const wobble = s.cheer > 0 ? Math.sin(s.cheer * 30) * 2 : 0;
+      g.strokeStyle = this.orange;
+      g.lineWidth = 4;
+      g.beginPath();
+      g.moveTo(s.x - s.w / 2, s.y + wobble);
+      g.lineTo(s.x + s.w / 2, s.y + wobble);
+      g.moveTo(s.x - s.w / 2 + 8, s.y);
+      g.lineTo(s.x - s.w / 2 + 8, s.y + 14);
+      g.moveTo(s.x + s.w / 2 - 8, s.y);
+      g.lineTo(s.x + s.w / 2 - 8, s.y + 14);
+      g.stroke();
+      // Faint slot hints.
+      g.lineWidth = 1.5;
+      g.globalAlpha = 0.22;
+      for (let i = 0; i < TUNING.SLOTS; i++) {
+        if (s.slots[i]) continue;
+        g.beginPath();
+        g.arc(game.slotX(s, i), s.y - r, r * 0.85, 0, Math.PI * 2);
+        g.stroke();
+      }
+      g.globalAlpha = 1;
+      const label: Marble = { id: -1 - k, style: FAMILIES[k].styles[0], family: k, x: s.x, y: s.y + r * 2.1, vx: 0, vy: 0, angle: 0, mode: 'placed', t: 0, sx: 0, sy: 0, shelf: -1, slot: -1, scale: 0.95 };
+      this.drawMarble(g, label, d);
+      if (s.cheer > 0) {
+        g.strokeStyle = this.orange;
+        g.globalAlpha = Math.min(1, s.cheer);
+        g.lineWidth = 3;
+        g.beginPath();
+        g.arc(s.x, s.y - r, s.w / 2 + 14 * (1.1 - s.cheer), 0, Math.PI * 2);
+        g.stroke();
+        g.globalAlpha = 1;
+      }
+    });
+
+    for (const m of game.marbles) if (m.mode !== 'held') this.drawMarble(g, m, d);
+    if (game.held) this.drawMarble(g, game.held, d);
+
+    for (const p of game.sparks) {
+      g.globalAlpha = Math.min(1, p.life * 1.5);
+      g.fillStyle = FAMILY_COLOR[p.family];
+      g.beginPath();
+      g.arc(p.x, p.y, 4, 0, Math.PI * 2);
+      g.fill();
+    }
+    g.globalAlpha = 1;
+
+    this.drawHud(g, W, d);
+    this.drawHands(g);
+    if (game.state !== 'play') this.drawScreen(g, W, H);
+  }
+
+  private drawHud(g: CanvasRenderingContext2D, W: number, d: number) {
+    const game = this.game;
+    const edge = parseFloat(css('--edge', '48')) || 48;
+    g.textBaseline = 'alphabetic';
+    g.fillStyle = '#121212';
+    g.textAlign = 'left';
+    g.font = '400 44px Atelier, "Clash Grotesk", sans-serif';
+    g.fillText(String(game.score), edge, game.chuteY + 38);
+    g.font = '14px "Clash Grotesk", sans-serif';
+    g.globalAlpha = 0.65;
+    g.fillText(`score · best ${game.best}`, edge, game.chuteY + 58);
+    g.globalAlpha = 1;
+    // Lives as small marbles; a lost one is an empty ring.
+    for (let i = 0; i < TUNING.LIVES; i++) {
+      const x = W - edge - 14 - i * 34;
+      const y = game.chuteY - 46;
+      if (i < game.lives) {
+        this.marbles.draw(g, { id: 900 + i, x, y, angle: 0 }, 12, 1, d, 0);
+      } else {
+        g.strokeStyle = this.orange;
+        g.globalAlpha = 0.5;
+        g.lineWidth = 2;
+        g.beginPath();
+        g.arc(x, y, 11, 0, Math.PI * 2);
+        g.stroke();
+        g.globalAlpha = 1;
+      }
+    }
+  }
+
+  /** Where each hand's pinch point is, so you can see what you are about to grab. */
+  private drawHands(g: CanvasRenderingContext2D) {
+    for (const h of Object.values(this.hands)) {
+      if (!h.point) continue;
+      g.strokeStyle = this.orange;
+      g.fillStyle = this.orange;
+      g.lineWidth = 3;
+      g.beginPath();
+      g.arc(h.point.x, h.point.y, h.down ? 9 : 14, 0, Math.PI * 2);
+      if (h.down) g.fill();
+      else g.stroke();
+    }
+  }
+
+  private drawScreen(g: CanvasRenderingContext2D, W: number, H: number) {
+    const game = this.game;
+    g.fillStyle = 'rgba(218,209,202,0.88)';
+    g.fillRect(0, 0, W, H);
+    g.textAlign = 'center';
+    const title = game.state === 'start' ? 'PINCH TO START' : 'GAME OVER';
+    const size = Math.min(72, W * 0.11);
+    g.font = `400 ${size}px Atelier, "Clash Grotesk", sans-serif`;
+    g.fillStyle = this.blue;
+    g.fillText(title, W / 2 - size * 0.05, H * 0.4 + size * 0.07);
+    g.fillStyle = this.orange;
+    g.fillText(title, W / 2, H * 0.4);
+    g.fillStyle = '#121212';
+    g.font = '400 22px "Clash Grotesk", sans-serif';
+    if (game.state === 'start') {
+      g.fillText('or click · put each marble on the shelf of its colour', W / 2, H * 0.4 + 46);
+    } else {
+      g.fillText(`Score ${game.score} · Best ${game.best}`, W / 2, H * 0.4 + 46);
+      g.fillText(game.ready ? 'Pinch to play again (or click)' : '', W / 2, H * 0.4 + 82);
+    }
+  }
+
+  dispose() {
+    this.cleanup.forEach((fn) => fn());
+    this.cleanup = [];
+    if (this.holder) this.game.release();
+    this.holder = null;
+  }
+}

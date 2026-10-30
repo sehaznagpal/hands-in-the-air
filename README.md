@@ -17,7 +17,7 @@ npm test           # unit tests for the hand signals
 npm run build      # static output in dist/ (works on Vercel as-is)
 ```
 
-The app opens on a homepage: **Turn on camera to start** asks for the camera, or **No camera? Try it with your mouse** unlocks the cards without one. Pick a card (Canvas, Mesh Bag, Car Window; Sort is coming soon) to open that scene. Routes: `#home` (default), `#canvas` and `#mesh` (the old `#netbag` redirects to `#mesh`). A scene link without camera access or mouse mode goes home first. The camera is shared, so switching scenes never restarts it, and **stop camera** / **start camera** sit bottom left next to the **?** help button. The preview (bottom right) can be minimised to a round button. No camera? Open `/?mock=1` for two simulated hands (`?mock=idle` shows the simulated camera with no hands, handy for layout checks).
+The app opens on a homepage: **Turn on camera to start** asks for the camera, or **No camera? Try it with your mouse** unlocks the cards without one. Pick a card (Canvas, Mesh Bag, Sort, Car Window) to open that scene. Routes: `#home` (default), `#canvas` and `#mesh` (the old `#netbag` redirects to `#mesh`). A scene link without camera access or mouse mode goes home first. The camera is shared, so switching scenes never restarts it, and **stop camera** / **start camera** sit bottom left next to the **?** help button. The preview (bottom right) can be minimised to a round button. No camera? Open `/?mock=1` for two simulated hands (`?mock=idle` shows the simulated camera with no hands, handy for layout checks).
 
 Live: https://hands-in-the-air.vercel.app · Repo: https://github.com/sehaznagpal/hands-in-the-air
 
@@ -119,3 +119,7 @@ unit-tested headless: `npm test`.
 ## Car Window (`#window`)
 
 A fogged car window on a rainy night. An open palm wipes wide, one extended finger draws a thin line (both hands at once); the mouse drags to wipe and Shift draws thin. Wiped glass fogs over again in about 20 seconds, with condensation beads, edge beads and now and then a drip. `F` or **Fog it up** re-fogs everything; `B` / `Shift+B` or the chips switch the background (night street, sunset coast, neon city). Drop `.jpg`, `.jpeg` or `.webp` files into `public/backgrounds/` and restart `npm run dev` (or rebuild) to add your own. The code is in `src/scenes/window/`: the mask, fog layer, beads and drips are in `fog.ts`, the procedural backgrounds in `backgrounds.ts`.
+
+## Sort (`#sort`)
+
+A small game: marbles drop from a chute and you put each on the shelf of its colour family (blue with dots, pink with stripes, green with swirls). Pinch thumb and index near a marble to grab it, let go over a shelf to place it; the mouse drags marbles too. Wrong shelf bounces, a marble that reaches the floor costs one of 3 lives, a full shelf pays a bonus. The best score is kept in `localStorage`. Every feel constant (grab radius, snap distance, drop interval, speed-up) is in the `TUNING` block at the top of `src/scenes/sort/game.ts`; the game logic has no DOM and is played by a bot in `game.test.ts`. The marble drawing is shared with Mesh Bag in `src/shared/marbles.ts`.
