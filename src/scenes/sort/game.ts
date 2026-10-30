@@ -1,5 +1,5 @@
 /**
- * Sort: one marble at a time floats down from a chute; hold it over the shelf of its colour and let go.
+ * Sort: one marble at a time floats down from a chute; hold it over the shelf with the same marble and let go.
  * Pure game logic with no DOM, so a bot can play it in the tests. Units are CSS pixels.
  */
 
@@ -30,8 +30,8 @@ export const TUNING = {
   // ---- rules and pace
   LIVES: 5,
   /** Marbles a shelf holds, and the bonus for filling one. */
-  SLOTS: 4,
-  SHELF_BONUS: 3,
+  SLOTS: 5,
+  SHELF_BONUS: 5,
   /** Seconds before the first marble, and between a marble being placed or lost and the next one. */
   FIRST_DROP: 1,
   DROP_DELAY: 1.5,
@@ -49,19 +49,27 @@ export const TUNING = {
   SCREEN_DELAY: 0.8,
 };
 
-/** Three colour families built from the existing marble styles, each with a pattern mark for colour-blind players. */
-export const FAMILIES = [
-  { name: 'blue', pattern: 'dots', styles: [4, 8, 2] },
-  { name: 'pink', pattern: 'stripes', styles: [3, 9, 11] },
-  { name: 'green', pattern: 'swirl', styles: [10, 0] },
-] as const;
+/**
+ * Marble designs that look alike share a group (the 12 styles of the shared marble drawing). Two shelves never
+ * show designs from the same group, so the three active designs differ clearly in colour and texture.
+ */
+export const DESIGN_GROUPS: number[][] = [
+  [0, 4, 8], // blues: aqua bubble, blue iridescent, sky pearl
+  [3, 9, 6, 11, 5], // pinks and lilacs
+  [10], // teal metal
+  [1], // rainbow bubble
+  [7], // frosted clear
+  [2], // smoky crystal
+];
+
+export const groupOf = (style: number) => DESIGN_GROUPS.findIndex((g) => g.includes(style));
 
 export type Mode = 'fall' | 'held' | 'snap' | 'placed' | 'leave' | 'splash' | 'reject';
 
 export interface Marble {
   id: number;
+  /** The marble's design (one of the 12 shared marble styles); it matches the shelf with the same design. */
   style: number;
-  family: number;
   x: number;
   y: number;
   vx: number;
@@ -81,7 +89,10 @@ export interface Shelf {
   x: number;
   y: number;
   w: number;
-  family: number;
+  /** The design this shelf takes, shown by the label marble at its left end. */
+  style: number;
+  /** Centre of the label marble. */
+  labelX: number;
   slots: (Marble | null)[];
   /** Seconds of celebration left. */
   cheer: number;
@@ -95,7 +106,8 @@ export interface Spark {
   vx: number;
   vy: number;
   life: number;
-  family: number;
+  /** Index into the confetti palette. */
+  hue: number;
 }
 
 export type GameState = 'start' | 'play' | 'over';
@@ -173,24 +185,51 @@ export class SortGame {
 
   constructor(private rand: () => number = Math.random) {}
 
+  /** A design from a group that none of `avoid` belongs to. */
+  private freshStyle(avoid: number[]) {
+    const taken = new Set(avoid.map(groupOf));
+    const pool = DESIGN_GROUPS.map((_, i) => i).filter((i) => !taken.has(i));
+    const group = DESIGN_GROUPS[pool[Math.floor(this.rand() * pool.length)]];
+    return group[Math.floor(this.rand() * group.length)];
+  }
+
+  /** Give the three shelves three clearly different designs. */
+  private dealDesigns() {
+    const chosen: number[] = [];
+    for (const s of this.shelves) {
+      s.style = this.freshStyle(chosen);
+      chosen.push(s.style);
+    }
+  }
+
   /** Place the shelves, chute and floor. `shelfY` is the shelf line, `topY` the chute opening. */
   layout(W: number, H: number, shelfY: number, topY: number) {
     this.W = W;
     this.H = H;
-    this.r = Math.max(15, Math.min(30, W * 0.026));
+    this.r = Math.max(12, Math.min(30, W * 0.026));
     this.chuteY = topY;
     this.floorY = H - 20;
     const old = this.shelves;
-    const w = Math.min(W * 0.26, TUNING.SLOTS * (2 * this.r + 10) + 24);
-    this.shelves = [0, 1, 2].map((k) => ({
-      x: W * (0.2 + 0.3 * k),
-      y: shelfY,
-      w,
-      family: k,
-      slots: old[k]?.slots ?? new Array(TUNING.SLOTS).fill(null),
-      cheer: old[k]?.cheer ?? 0,
-      shake: old[k]?.shake ?? 0,
-    }));
+    // Three equal units, each: a label marble at the left end, then the shelf.
+    const margin = Math.max(16, W * 0.04);
+    const third = (W - 2 * margin) / 3;
+    const unit = third - 14;
+    const labelW = 2 * this.r + 6;
+    const w = Math.min(TUNING.SLOTS * (2 * this.r + 8) + 24, unit - labelW - 8);
+    this.shelves = [0, 1, 2].map((k) => {
+      const left = margin + third * k + 7;
+      return {
+        x: left + labelW + 6 + w / 2,
+        y: shelfY,
+        w,
+        style: old[k]?.style ?? 0,
+        labelX: left + this.r + 2,
+        slots: old[k]?.slots ?? new Array(TUNING.SLOTS).fill(null),
+        cheer: old[k]?.cheer ?? 0,
+        shake: old[k]?.shake ?? 0,
+      };
+    });
+    if (!old.length) this.dealDesigns();
     for (const m of this.marbles) if (m.mode === 'placed' || m.mode === 'snap') this.slotPos(m);
   }
 
@@ -208,7 +247,7 @@ export class SortGame {
   /** The tall drop zone of a shelf: the shelf plus the area above it. */
   zone(s: Shelf) {
     return {
-      left: s.x - s.w / 2 - TUNING.ZONE_MARGIN,
+      left: s.labelX - this.r - 8,
       right: s.x + s.w / 2 + TUNING.ZONE_MARGIN,
       top: s.y - TUNING.ZONE_HEIGHT * this.H,
       bottom: s.y + this.r * 1.2,
@@ -242,6 +281,7 @@ export class SortGame {
       s.cheer = 0;
       s.shake = 0;
     }
+    this.dealDesigns();
   }
 
   /** Fall speed now: slow for the very first marble, then a little faster after every 10 points. */
@@ -256,13 +296,11 @@ export class SortGame {
   }
 
   private spawn() {
-    // Any colour, in random order.
-    const family = Math.floor(this.rand() * 3);
-    const styles = FAMILIES[family].styles;
+    // Only designs that are on a shelf right now drop, in random order.
+    const style = this.shelves[Math.floor(this.rand() * 3)].style;
     const m: Marble = {
       id: this.nextId++,
-      style: styles[Math.floor(this.rand() * styles.length)],
-      family,
+      style,
       x: this.W / 2 + (this.rand() - 0.5) * this.W * 0.1,
       y: this.chuteY + this.r,
       vx: (this.rand() - 0.5) * 20,
@@ -321,7 +359,7 @@ export class SortGame {
   }
 
   /**
-   * Let go of the carried marble. Anywhere in a shelf's zone: the right colour slides into the next free slot,
+   * Let go of the carried marble. Anywhere in a shelf's zone: the same design slides into the next free slot,
    * the wrong one is rejected and costs a life. Outside every zone it simply falls.
    */
   release(at?: { x: number; y: number }) {
@@ -342,7 +380,7 @@ export class SortGame {
     }
     const shelf = this.shelves[k];
     const slot = shelf.slots.indexOf(null);
-    if (shelf.family === m.family && slot >= 0) {
+    if (shelf.style === m.style && slot >= 0) {
       shelf.slots[slot] = m;
       m.mode = 'snap';
       m.t = 0;
@@ -354,7 +392,7 @@ export class SortGame {
       this.resolve(m);
       return;
     }
-    // Wrong shelf: a small shake, the marble bounces away, and it costs a life.
+    // A different design: a small shake, the marble bounces away, and it costs a life.
     m.mode = 'reject';
     m.t = 0;
     m.vx = (this.rand() < 0.5 ? -1 : 1) * 150;
@@ -466,7 +504,7 @@ export class SortGame {
     }
   }
 
-  /** A full shelf cheers, pays a bonus, and empties. */
+  /** A full shelf cheers, pays a bonus, empties and takes a new design. */
   private checkShelves() {
     for (const s of this.shelves) {
       if (s.cheer > 0) continue;
@@ -479,8 +517,10 @@ export class SortGame {
           m.t = 0;
         }
         s.slots.fill(null);
+        // The cleared shelf takes a new design, different from the other two shelves and from its old one.
+        s.style = this.freshStyle([...this.shelves.map((o) => o.style)]);
         for (let i = 0; i < 26; i++) {
-          this.sparks.push({ x: s.x + (this.rand() - 0.5) * s.w, y: s.y - this.r, vx: (this.rand() - 0.5) * 360, vy: -120 - this.rand() * 260, life: 0.8 + this.rand() * 0.6, family: s.family });
+          this.sparks.push({ x: s.x + (this.rand() - 0.5) * s.w, y: s.y - this.r, vx: (this.rand() - 0.5) * 360, vy: -120 - this.rand() * 260, life: 0.8 + this.rand() * 0.6, hue: i % 4 });
         }
       }
     }

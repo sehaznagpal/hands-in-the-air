@@ -1,5 +1,4 @@
 import { renderMarble, type MarbleLayers } from '../shared/marbles';
-import { familyMark } from '../scenes/sort/index';
 import { GuideCell, drawGuideHand, handPoints } from './cell';
 import { PINCH } from './poses';
 import type { State } from './timeline';
@@ -10,7 +9,7 @@ const ease = (x: number) => clamp01(x) * clamp01(x) * (3 - 2 * clamp01(x));
 const lerp = (a: number, b: number, k: number) => a + (b - a) * k;
 
 const cache = new Map<number, MarbleLayers>();
-function marble(g: CanvasRenderingContext2D, style: number, family: number, x: number, y: number, r: number, alpha = 1) {
+function marble(g: CanvasRenderingContext2D, style: number, x: number, y: number, r: number, alpha = 1) {
   if (r < 1 || alpha <= 0) return;
   let l = cache.get(style);
   if (!l) cache.set(style, (l = renderMarble(style, 96)));
@@ -20,7 +19,6 @@ function marble(g: CanvasRenderingContext2D, style: number, family: number, x: n
   g.drawImage(l.pattern, x - d / 2, y - d / 2, d, d);
   g.drawImage(l.gloss, x - d / 2, y - d / 2, d, d);
   g.restore();
-  familyMark(g, family, x, y, r, alpha);
 }
 
 function badge(cell: GuideCell, text: string) {
@@ -59,11 +57,12 @@ export function createSortCells(): GuideCell[] {
     g.lineWidth = 3;
     g.lineCap = 'round';
     g.beginPath();
-    g.moveTo(w * 0.54, h * 0.8);
+    g.moveTo(w * 0.52, h * 0.8);
     g.lineTo(w * 0.9, h * 0.8);
     g.stroke();
     g.restore();
-    marble(g, 4, 0, w * 0.72, h * 0.9, h * 0.06);
+    // The label marble sits at the shelf's left end.
+    marble(g, 4, w * 0.54 - h * 0.075, h * 0.8 - h * 0.06, h * 0.06);
   };
 
   // 1. Pinch to grab a marble.
@@ -83,7 +82,7 @@ export function createSortCells(): GuideCell[] {
       const handY = lerp(lerp(0.3, my - off.y, approach), 0.42 - off.y, lift);
       const alpha = clamp01((t - 0.1) / 0.3) * clamp01((4.1 - t) / 0.4);
       const pinchY = handY + off.y;
-      marble(g, 4, 0, mx * w, (close >= 1 ? pinchY : my) * h, h * 0.085, alpha);
+      marble(g, 4, mx * w, (close >= 1 ? pinchY : my) * h, h * 0.085, alpha);
       drawGuideHand(g, w, h, state(handX, handY, close, alpha), orange, size, PINCH);
     },
   });
@@ -94,7 +93,7 @@ export function createSortCells(): GuideCell[] {
   const hold = new GuideCell({
     duration: D2,
     staticTime: 2.6,
-    caption: 'Hold it over the shelf with the same colour',
+    caption: 'Put each marble on the shelf with the same marble',
     render: (g, w, h, t) => {
       const off = pinchAt(w, h);
       const move = ease((t - 0.6) / 1.4);
@@ -102,7 +101,7 @@ export function createSortCells(): GuideCell[] {
       const py = lerp(0.36, 0.42, move);
       const alpha = clamp01((t - 0.1) / 0.3) * clamp01((4.1 - t) / 0.4);
       shelf(g, w, h, ease((t - 1.7) / 0.3) * alpha);
-      marble(g, 4, 0, px * w, py * h, h * 0.085, alpha);
+      marble(g, 4, px * w, py * h, h * 0.085, alpha);
       drawGuideHand(g, w, h, state(px - off.x, py - off.y, 1, alpha), orange, size, PINCH);
     },
   });
@@ -123,7 +122,7 @@ export function createSortCells(): GuideCell[] {
       shelf(g, w, h, alpha);
       const r = h * 0.085;
       const fall = ease((t - 1.45) / 0.45);
-      marble(g, 4, 0, px * w, lerp(py, 0.8 - r / h, fall) * h, r, alpha);
+      marble(g, 4, px * w, lerp(py, 0.8 - r / h, fall) * h, r, alpha);
       drawGuideHand(g, w, h, state(px - off.x, py - off.y, 1 - open, alpha), orange, size, PINCH);
       if (t > 1.9) {
         g.save();
@@ -159,7 +158,7 @@ export function createSortCells(): GuideCell[] {
       const r = h * 0.085;
       const y = lerp(-r, 0.9 - r / h, fall * fall) * h;
       const splash = clamp01((t - 2) / 0.35);
-      marble(g, 3, 1, w * 0.4, y, r * (1 - splash));
+      marble(g, 3, w * 0.4, y, r * (1 - splash));
       const lost = clamp01((t - 2) / 0.3) * clamp01(1 - (t - 3.7) / 0.4);
       for (let i = 0; i < 5; i++) {
         const x = w * (0.94 - 0.07 * i);
@@ -173,7 +172,7 @@ export function createSortCells(): GuideCell[] {
           g.stroke();
           g.restore();
         } else {
-          marble(g, 4, 0, x, yy, h * 0.04);
+          marble(g, 4, x, yy, h * 0.04);
         }
       }
       if (t > 2 && t < 3.7) {

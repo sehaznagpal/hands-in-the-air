@@ -1,49 +1,13 @@
 import type { HandSignals } from '../../hands';
 import type { Scene, SceneContext } from '../../scene';
 import { MarbleRenderer } from '../../shared/marbles';
-import { FAMILIES, PinchHold, SortGame, TUNING, isPinched, type Marble } from './game';
+import { PinchHold, SortGame, TUNING, isPinched, type Marble } from './game';
 
 const BEST_KEY = 'sort-best';
-/** Colours of the three families, used for confetti and the pattern marks' backdrop. */
-const FAMILY_COLOR = ['#2f6fe0', '#e0549a', '#1fa38a'];
+/** Confetti colours for a full shelf. */
+const CONFETTI = ['#c84a12', '#0a3699', '#f2b63a', '#e0549a'];
 
 const css = (name: string, fallback: string) => getComputedStyle(document.documentElement).getPropertyValue(name).trim() || fallback;
-
-/** A small white mark per family (dots, stripes, swirl) so the game works without telling colours apart. */
-export function familyMark(g: CanvasRenderingContext2D, family: number, x: number, y: number, r: number, alpha = 1) {
-  g.save();
-  g.translate(x, y);
-  g.globalAlpha = alpha;
-  g.strokeStyle = g.fillStyle = 'rgba(255,255,255,0.96)';
-  g.shadowColor = 'rgba(0,0,0,0.5)';
-  g.shadowBlur = 2;
-  g.lineWidth = Math.max(1.5, r * 0.11);
-  g.lineCap = 'round';
-  g.beginPath();
-  if (family === 0) {
-    for (const [dx, dy] of [[0, -0.3], [-0.28, 0.2], [0.28, 0.2]]) {
-      g.moveTo(dx * r + r * 0.12, dy * r);
-      g.arc(dx * r, dy * r, r * 0.12, 0, Math.PI * 2);
-    }
-    g.fill();
-  } else if (family === 1) {
-    for (let k = -1; k <= 1; k++) {
-      g.moveTo(-0.32 * r + k * 0.3 * r, 0.4 * r);
-      g.lineTo(0.12 * r + k * 0.3 * r, -0.4 * r);
-    }
-    g.stroke();
-  } else {
-    for (let a = 0; a <= Math.PI * 4; a += 0.2) {
-      const rad = r * (0.06 + a * 0.032);
-      const px = Math.cos(a) * rad;
-      const py = Math.sin(a) * rad;
-      if (a === 0) g.moveTo(px, py);
-      else g.lineTo(px, py);
-    }
-    g.stroke();
-  }
-  g.restore();
-}
 
 interface Hand {
   /** Whether the fingers were pinched last frame, to spot a fresh pinch. */
@@ -53,7 +17,7 @@ interface Hand {
 
 /** Sort: pinch marbles out of the air and put each on the shelf of its colour family. */
 export class SortScene implements Scene {
-  readonly help = 'Pinch to grab a marble, hold it over the shelf with the same colour, open your fingers to drop it. A wrong shelf or a dropped marble costs a life (5 lives).';
+  readonly help = 'Put each marble on the shelf with the same marble. Pinch to grab it, open your fingers to drop it. A wrong shelf or a dropped marble costs a life (5 lives).';
 
   private ctx!: SceneContext;
   private game = new SortGame();
@@ -194,7 +158,6 @@ export class SortScene implements Scene {
     const r = this.game.r * m.scale;
     if (r < 1) return;
     this.marbles.draw(g, m, r, 1, d, m.style);
-    familyMark(g, m.family, m.x, m.y, r, m.scale);
     if (m.mode === 'held') {
       g.strokeStyle = this.orange;
       g.lineWidth = 3;
@@ -277,7 +240,8 @@ export class SortScene implements Scene {
         g.stroke();
       }
       g.globalAlpha = 1;
-      const label: Marble = { id: -1 - k, style: FAMILIES[k].styles[0], family: k, x: s.x, y: s.y + r * 2.1, vx: 0, vy: 0, angle: 0, mode: 'placed', t: 0, sx: 0, sy: 0, shelf: -1, slot: -1, scale: 0.95 };
+      // The label marble at the shelf's left end shows which design belongs here.
+      const label: Marble = { id: -1 - k, style: s.style, x: s.labelX, y: s.y - r, vx: 0, vy: 0, angle: 0, mode: 'placed', t: 0, sx: 0, sy: 0, shelf: -1, slot: -1, scale: 1 };
       this.drawMarble(g, label, d);
       if (s.cheer > 0) {
         g.strokeStyle = this.orange;
@@ -295,7 +259,7 @@ export class SortScene implements Scene {
 
     for (const p of game.sparks) {
       g.globalAlpha = Math.min(1, p.life * 1.5);
-      g.fillStyle = FAMILY_COLOR[p.family];
+      g.fillStyle = CONFETTI[p.hue % CONFETTI.length];
       g.beginPath();
       g.arc(p.x, p.y, 4, 0, Math.PI * 2);
       g.fill();
@@ -314,7 +278,7 @@ export class SortScene implements Scene {
     const m = game.active;
     if (game.state !== 'play' || !game.firstMarble || !m) return;
     let text = 'Pinch to grab it';
-    if (m.mode === 'held') text = game.hover === m.family ? 'Open your fingers to drop' : 'Move it over the matching shelf';
+    if (m.mode === 'held') text = game.hover >= 0 && game.shelves[game.hover].style === m.style ? 'Open your fingers to drop' : 'Match the marble';
     else if (m.mode !== 'fall') return;
     g.font = '500 20px "Clash Grotesk", sans-serif';
     const w = g.measureText(text).width + 28;
@@ -390,7 +354,7 @@ export class SortScene implements Scene {
     g.fillStyle = '#121212';
     g.font = '400 22px "Clash Grotesk", sans-serif';
     if (game.state === 'start') {
-      g.fillText('or click · hold each marble over the shelf of its colour', W / 2, H * 0.4 + 46);
+      g.fillText('or click · put each marble on the shelf with the same marble', W / 2, H * 0.4 + 46);
     } else {
       g.fillText(`Score ${game.score} · Best ${game.best}`, W / 2, H * 0.4 + 46);
       g.fillText(game.ready ? 'Pinch to play again (or click)' : '', W / 2, H * 0.4 + 82);

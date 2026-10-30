@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { PinchHold, SortGame, TUNING } from './game';
+import { groupOf, PinchHold, SortGame, TUNING } from './game';
 
 function rng(seed = 3) {
   let s = seed;
@@ -30,7 +30,7 @@ function play(seconds: number, react: number, carry: number, seed = 3) {
     }
     if (bot) {
       bot.t += dt;
-      const s = g.shelves[bot.m.family];
+      const s = g.shelves.find((sh) => sh.style === bot!.m.style)!;
       const k = Math.min(1, bot.t / carry);
       g.moveHeld(bot.from.x + (s.x - bot.from.x) * k, bot.from.y + (s.y - 3 * g.r - bot.from.y) * k);
       if (bot.t > carry + 0.4) {
@@ -71,7 +71,7 @@ describe('sort game', () => {
     for (let i = 0; i < 90; i++) g.update(1 / 60);
     const m = g.active!;
     g.grabAt(m.x, m.y);
-    const s = g.shelves[m.family];
+    const s = g.shelves.find((sh) => sh.style === m.style)!;
     g.moveHeld(s.x, s.y - 3 * g.r);
     for (let i = 0; i < 30; i++) g.update(1 / 60);
     g.release();
@@ -82,27 +82,27 @@ describe('sort game', () => {
     expect(g.active).not.toBeNull();
   });
 
-  it('a release anywhere in the tall zone slides the right marble in, high above the shelf too', () => {
+  it('a release anywhere in the tall zone slides the same design in, high above the shelf too', () => {
     const g = make();
     for (let i = 0; i < 90; i++) g.update(1 / 60);
     const m = g.active!;
     g.grabAt(m.x, m.y);
-    const s = g.shelves[m.family];
+    const s = g.shelves.find((sh) => sh.style === m.style)!;
     g.moveHeld(s.x + s.w / 2 + 20, s.y - 0.3 * g.H);
     for (let i = 0; i < 40; i++) g.update(1 / 60);
-    expect(g.hover).toBe(m.family);
+    expect(g.hover).toBe(g.shelves.indexOf(s));
     g.release();
     for (let i = 0; i < 40; i++) g.update(1 / 60);
     expect(m.mode).toBe('placed');
     expect(g.score).toBe(1);
   });
 
-  it('the wrong shelf costs exactly one life and the marble does not cost a second at the floor', () => {
+  it('a different design costs exactly one life and the marble does not cost a second at the floor', () => {
     const g = make();
     for (let i = 0; i < 90; i++) g.update(1 / 60);
     const m = g.active!;
     g.grabAt(m.x, m.y);
-    const wrong = g.shelves[(m.family + 1) % 3];
+    const wrong = g.shelves.find((sh) => sh.style !== m.style)!;
     g.moveHeld(wrong.x, wrong.y - 2 * g.r);
     for (let i = 0; i < 40; i++) g.update(1 / 60);
     g.release();
@@ -113,11 +113,12 @@ describe('sort game', () => {
     expect(g.score).toBe(0);
   });
 
-  it('a full shelf pays the bonus and empties', () => {
+  it('a full shelf holds 5, pays +5, empties and takes a new design', () => {
     const g = make();
     const s = g.shelves[0];
+    const oldStyle = s.style;
     for (let n = 0; n < TUNING.SLOTS; n++) {
-      const m = { id: 100 + n, style: 4, family: 0, x: s.x, y: s.y - 2 * g.r, vx: 0, vy: 0, angle: 0, mode: 'fall' as const, t: 0, sx: 0, sy: 0, shelf: -1, slot: -1, scale: 1 };
+      const m = { id: 100 + n, style: s.style, x: s.x, y: s.y - 2 * g.r, vx: 0, vy: 0, angle: 0, mode: 'fall' as const, t: 0, sx: 0, sy: 0, shelf: -1, slot: -1, scale: 1 };
       g.marbles.push(m);
       g.grabAt(m.x, m.y);
       g.moveHeld(s.x, s.y - 2 * g.r);
@@ -125,8 +126,12 @@ describe('sort game', () => {
       g.release();
       for (let i = 0; i < 30; i++) g.update(1 / 60);
     }
+    expect(TUNING.SLOTS).toBe(5);
     expect(g.score).toBeGreaterThanOrEqual(TUNING.SLOTS + TUNING.SHELF_BONUS);
     expect(s.slots.every((x) => x === null)).toBe(true);
+    expect(s.style).not.toBe(oldStyle);
+    const groups = g.shelves.map((sh) => groupOf(sh.style));
+    expect(new Set(groups).size).toBe(3);
   });
 
   it('falls slowly and speeds up only gently after every 10 points', () => {
@@ -138,6 +143,55 @@ describe('sort game', () => {
     expect(b - a).toBe(TUNING.SPEEDUP_PER_10);
     expect(g.fallSpeed()).toBeLessThanOrEqual(TUNING.MAX_FALL);
     expect(TUNING.FIRST_FALL).toBeLessThan(TUNING.START_FALL);
+  });
+});
+
+describe('designs', () => {
+  it('the three shelves always show clearly different designs, also after refills', () => {
+    for (let seed = 1; seed < 30; seed++) {
+      const g = make(seed);
+      const check = () => expect(new Set(g.shelves.map((s) => groupOf(s.style))).size).toBe(3);
+      check();
+      for (let round = 0; round < 6; round++) {
+        const s = g.shelves[round % 3];
+        for (let n = 0; n < TUNING.SLOTS; n++) {
+          const m = { id: 500 + round * 10 + n, style: s.style, x: s.x, y: s.y - 2 * g.r, vx: 0, vy: 0, angle: 0, mode: 'fall' as const, t: 0, sx: 0, sy: 0, shelf: -1, slot: -1, scale: 1 };
+          g.marbles.push(m);
+          g.grabAt(m.x, m.y);
+          g.moveHeld(s.x, s.y - 2 * g.r);
+          for (let i = 0; i < 25; i++) g.update(1 / 60);
+          g.release();
+          for (let i = 0; i < 25; i++) g.update(1 / 60);
+        }
+        check();
+      }
+    }
+  });
+
+  it('only designs that are on a shelf drop', () => {
+    const g = make(5);
+    const seen = new Set<number>();
+    for (let t = 0; t < 600 && g.state === 'play'; t += 1 / 60) {
+      g.update(1 / 60);
+      if (g.active) {
+        seen.add(g.active.style);
+        expect(g.shelves.map((s) => s.style)).toContain(g.active.style);
+      }
+    }
+    expect(seen.size).toBeGreaterThan(0);
+  });
+
+  it('a different design bounces off and costs a life', () => {
+    const g = make(9);
+    for (let i = 0; i < 90; i++) g.update(1 / 60);
+    const m = g.active!;
+    g.grabAt(m.x, m.y);
+    const wrong = g.shelves.find((s) => s.style !== m.style)!;
+    g.moveHeld(wrong.x, wrong.y - 2 * g.r);
+    for (let i = 0; i < 40; i++) g.update(1 / 60);
+    g.release();
+    expect(m.mode).toBe('reject');
+    expect(g.lives).toBe(TUNING.LIVES - 1);
   });
 });
 

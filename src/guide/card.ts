@@ -46,7 +46,7 @@ export function buildHelpCard(sceneId: string, fallback: string): HelpCard {
     note.textContent = 'No camera? Click a marble, then click a shelf.';
     note.setAttribute('aria-hidden', 'true');
     el.append(
-      srOnly('Pinch your thumb and index finger to grab a marble. Hold it over the shelf with the same colour. Open your fingers to drop it. A wrong shelf or a dropped marble costs a life; you have 5 lives. No camera? Click a marble, then click a shelf.'),
+      srOnly('Pinch your thumb and index finger to grab a marble. Put each marble on the shelf with the same marble. Open your fingers to drop it. A wrong shelf or a dropped marble costs a life; you have 5 lives. No camera? Click a marble, then click a shelf.'),
       grid,
       note,
     );
