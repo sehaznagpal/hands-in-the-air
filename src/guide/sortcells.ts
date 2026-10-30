@@ -40,13 +40,38 @@ export function createSortCells(): GuideCell[] {
     const p = handPoints(w, h, state(0.5, 0.5, 1), size, PINCH);
     return { x: (p[4].x + p[8].x) / 2 / w - 0.5, y: (p[4].y + p[8].y) / 2 / h - 0.5 };
   };
+  const shelf = (g: CanvasRenderingContext2D, w: number, h: number, glow: number) => {
+    g.save();
+    if (glow > 0) {
+      g.fillStyle = `rgba(200,74,18,${0.16 * glow})`;
+      g.strokeStyle = orange;
+      g.globalAlpha = glow;
+      g.setLineDash([6, 5]);
+      g.lineWidth = 2;
+      g.beginPath();
+      g.roundRect(w * 0.5, h * 0.14, w * 0.44, h * 0.7, 10);
+      g.fill();
+      g.stroke();
+      g.setLineDash([]);
+      g.globalAlpha = 1;
+    }
+    g.strokeStyle = orange;
+    g.lineWidth = 3;
+    g.lineCap = 'round';
+    g.beginPath();
+    g.moveTo(w * 0.54, h * 0.8);
+    g.lineTo(w * 0.9, h * 0.8);
+    g.stroke();
+    g.restore();
+    marble(g, 4, 0, w * 0.72, h * 0.9, h * 0.06);
+  };
 
-  // 1. Pinch to pick a marble up.
+  // 1. Pinch to grab a marble.
   const D1 = 4.5;
   const pick = new GuideCell({
     duration: D1,
     staticTime: 2.6,
-    caption: 'Pinch to pick up a marble',
+    caption: 'Pinch to grab a marble',
     render: (g, w, h, t) => {
       const off = pinchAt(w, h);
       const mx = 0.5;
@@ -58,65 +83,67 @@ export function createSortCells(): GuideCell[] {
       const handY = lerp(lerp(0.3, my - off.y, approach), 0.42 - off.y, lift);
       const alpha = clamp01((t - 0.1) / 0.3) * clamp01((4.1 - t) / 0.4);
       const pinchY = handY + off.y;
-      const markY = lerp(my, pinchY, close >= 1 ? 1 : 0);
-      marble(g, 4, 0, mx * w, (close >= 1 ? pinchY : markY) * h, h * 0.085, alpha);
+      marble(g, 4, 0, mx * w, (close >= 1 ? pinchY : my) * h, h * 0.085, alpha);
       drawGuideHand(g, w, h, state(handX, handY, close, alpha), orange, size, PINCH);
     },
   });
   badge(pick, 'pinch');
 
-  // 2. Carry it over and let go on the matching shelf.
-  const D2 = 5;
-  const carry = new GuideCell({
+  // 2. Hold it over the shelf with the same colour: the shelf lights up.
+  const D2 = 4.5;
+  const hold = new GuideCell({
     duration: D2,
-    staticTime: 2.3,
-    caption: 'Move it and let go on the matching shelf',
+    staticTime: 2.6,
+    caption: 'Hold it over the shelf with the same colour',
     render: (g, w, h, t) => {
-      // Shelf with its label marble.
-      g.save();
-      g.strokeStyle = orange;
-      g.lineWidth = 3;
-      g.lineCap = 'round';
-      g.beginPath();
-      g.moveTo(w * 0.52, h * 0.8);
-      g.lineTo(w * 0.9, h * 0.8);
-      g.stroke();
-      g.restore();
-      marble(g, 4, 0, w * 0.71, h * 0.9, h * 0.06);
       const off = pinchAt(w, h);
-      const move = ease((t - 0.9) / 1.4);
-      const release = ease((t - 2.5) / 0.3);
-      const px = lerp(0.22, 0.71, move);
-      const py = lerp(0.34, 0.5, move);
-      const handX = px - off.x;
-      const handY = py - off.y;
-      const alpha = clamp01((t - 0.1) / 0.3) * clamp01((4.3 - t) / 0.4);
+      const move = ease((t - 0.6) / 1.4);
+      const px = lerp(0.2, 0.72, move);
+      const py = lerp(0.36, 0.42, move);
+      const alpha = clamp01((t - 0.1) / 0.3) * clamp01((4.1 - t) / 0.4);
+      shelf(g, w, h, ease((t - 1.7) / 0.3) * alpha);
+      marble(g, 4, 0, px * w, py * h, h * 0.085, alpha);
+      drawGuideHand(g, w, h, state(px - off.x, py - off.y, 1, alpha), orange, size, PINCH);
+    },
+  });
+  badge(hold, 'hold');
+
+  // 3. Open your fingers to drop it: it slides into the shelf.
+  const D3 = 4.5;
+  const drop = new GuideCell({
+    duration: D3,
+    staticTime: 2.2,
+    caption: 'Open your fingers to drop it',
+    render: (g, w, h, t) => {
+      const off = pinchAt(w, h);
+      const px = 0.72;
+      const py = 0.4;
+      const open = ease((t - 1.2) / 0.35);
+      const alpha = clamp01((t - 0.1) / 0.3) * clamp01((4.1 - t) / 0.4);
+      shelf(g, w, h, alpha);
       const r = h * 0.085;
-      // The marble rides the pinch, then drops onto the shelf.
-      const drop = ease((t - 2.55) / 0.3);
-      const my = t < 2.55 ? py : lerp(py, 0.8 - r / h, drop);
-      marble(g, 4, 0, px * w, my * h, r, alpha);
-      drawGuideHand(g, w, h, state(handX, handY, 1 - release, alpha), orange, size, PINCH);
-      // +1 pops up after the landing.
-      if (t > 2.9) {
+      const fall = ease((t - 1.45) / 0.45);
+      marble(g, 4, 0, px * w, lerp(py, 0.8 - r / h, fall) * h, r, alpha);
+      drawGuideHand(g, w, h, state(px - off.x, py - off.y, 1 - open, alpha), orange, size, PINCH);
+      if (t > 1.9) {
         g.save();
-        g.globalAlpha = clamp01(1 - (t - 2.9) / 1.2) * alpha;
+        g.globalAlpha = clamp01(1 - (t - 1.9) / 1.2) * alpha;
         g.fillStyle = '#fff';
         g.font = '600 18px "Clash Grotesk", sans-serif';
         g.textAlign = 'center';
-        g.fillText('+1', px * w, h * 0.68 - (t - 2.9) * 14);
+        g.fillText('+1', px * w, h * 0.66 - (t - 1.9) * 14);
         g.restore();
       }
     },
   });
-  badge(carry, 'pinch');
+  badge(drop, 'open');
 
-  // 3. A marble that reaches the floor costs a life.
-  const D3 = 4.5;
+  // 4. A wrong shelf or a dropped marble costs a life (5 lives).
+  const D4 = 4.5;
   const miss = new GuideCell({
-    duration: D3,
+    duration: D4,
     staticTime: 2.2,
-    caption: 'Missed marbles cost a life',
+    caption: 'Wrong shelf or a dropped marble costs a life (5 lives)',
     render: (g, w, h, t) => {
       g.save();
       g.strokeStyle = orange;
@@ -128,27 +155,25 @@ export function createSortCells(): GuideCell[] {
       g.lineTo(w * 0.94, h * 0.9);
       g.stroke();
       g.restore();
-      // Falling marble, then a splash.
       const fall = clamp01((t - 0.5) / 1.5);
       const r = h * 0.085;
       const y = lerp(-r, 0.9 - r / h, fall * fall) * h;
       const splash = clamp01((t - 2) / 0.35);
       marble(g, 3, 1, w * 0.4, y, r * (1 - splash));
-      // Three lives; the last one empties when the marble lands, then they refill.
       const lost = clamp01((t - 2) / 0.3) * clamp01(1 - (t - 3.7) / 0.4);
-      for (let i = 0; i < 3; i++) {
-        const x = w * (0.94 - 0.09 * i);
+      for (let i = 0; i < 5; i++) {
+        const x = w * (0.94 - 0.07 * i);
         const yy = h * 0.14;
         if (i === 0 && lost > 0.5) {
           g.save();
           g.strokeStyle = '#ff6b4a';
           g.lineWidth = 2;
           g.beginPath();
-          g.arc(x, yy, h * 0.05, 0, Math.PI * 2);
+          g.arc(x, yy, h * 0.04, 0, Math.PI * 2);
           g.stroke();
           g.restore();
         } else {
-          marble(g, 4, 0, x, yy, h * 0.05);
+          marble(g, 4, 0, x, yy, h * 0.04);
         }
       }
       if (t > 2 && t < 3.7) {
@@ -164,5 +189,5 @@ export function createSortCells(): GuideCell[] {
   });
   badge(miss, 'watch out');
 
-  return [pick, carry, miss];
+  return [pick, hold, drop, miss];
 }

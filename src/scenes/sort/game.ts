@@ -1,34 +1,50 @@
 /**
- * Sort: marbles drop from a chute; catch each one and put it on the shelf of its colour family.
+ * Sort: one marble at a time floats down from a chute; hold it over the shelf of its colour and let go.
  * Pure game logic with no DOM, so a bot can play it in the tests. Units are CSS pixels.
  */
 
 /** Everything you might want to tune, in one place. */
 export const TUNING = {
-  /** How far from a marble (px) a pinch or click still grabs it. Generous on purpose. */
-  GRAB_RADIUS: 95,
-  /** A pinch must stay open this long (s) before the marble is let go: ignores one-frame flicker. */
-  PINCH_RELEASE_GRACE: 0.12,
-  /** How far outside a shelf (px) a release still counts as "over the shelf". */
-  SNAP_DISTANCE: 60,
+  // ---- grabbing
+  /** Grab reach as a multiple of the marble's diameter (about 2x the marble size). */
+  GRAB_RADIUS_FACTOR: 2,
+  /** Thumb-to-index distance (in hand scales) below which a pinch grabs. */
+  PINCH_CLOSE: 0.35,
+  /** Distance above which the fingers count as clearly open; wide on purpose so a loose pinch keeps holding. */
+  PINCH_OPEN: 0.75,
+  /** The fingers must stay clearly open this long (s) before the marble is let go. */
+  OPEN_HOLD: 0.2,
+  /** If the hand is lost while holding, keep holding this long (s), the marble staying where it was. */
+  LOSS_HOLD: 0.6,
   /** Time constant (s) of the light smoothing on a carried marble. */
-  GRAB_SMOOTH: 0.05,
-  /** Seconds between drops at the start, the fastest it gets, and how much it shortens per second played. */
-  START_INTERVAL: 4,
-  MIN_INTERVAL: 1.4,
-  SPEEDUP_PER_SEC: 0.03,
-  /** Fall speed (px/s) at the start, its growth per second played, and its cap. */
-  START_FALL: 190,
-  FALL_SPEEDUP: 2.2,
-  MAX_FALL: 400,
-  /** Downward acceleration (px/s^2) until the fall speed is reached. */
-  GRAVITY: 240,
-  LIVES: 3,
+  GRAB_SMOOTH: 0.06,
+
+  // ---- placing
+  /** How far past the shelf's ends (px) the drop zone reaches. */
+  ZONE_MARGIN: 40,
+  /** Height of the drop zone above the shelf, as a share of the screen height. */
+  ZONE_HEIGHT: 0.36,
+  /** Seconds for a marble to slide into its slot. */
+  SNAP_TIME: 0.3,
+
+  // ---- rules and pace
+  LIVES: 5,
   /** Marbles a shelf holds, and the bonus for filling one. */
   SLOTS: 4,
-  SHELF_BONUS: 5,
-  /** Seconds for a marble to hop into its slot. */
-  SNAP_TIME: 0.28,
+  SHELF_BONUS: 3,
+  /** Seconds before the first marble, and between a marble being placed or lost and the next one. */
+  FIRST_DROP: 1,
+  DROP_DELAY: 1.5,
+  /** Fall speed (px/s): the very first marble of the first game, then the normal start speed. */
+  FIRST_FALL: 45,
+  START_FALL: 80,
+  /** Extra fall speed after every 10 points, and the cap. */
+  SPEEDUP_PER_10: 8,
+  MAX_FALL: 150,
+  /** Gentle downward acceleration (px/s^2) until the fall speed is reached. */
+  GRAVITY: 70,
+  /** Seconds a rejected marble bounces away for. */
+  REJECT_TIME: 0.6,
   /** Seconds the start and game over screens ignore input after appearing. */
   SCREEN_DELAY: 0.8,
 };
@@ -40,7 +56,7 @@ export const FAMILIES = [
   { name: 'green', pattern: 'swirl', styles: [10, 0] },
 ] as const;
 
-export type Mode = 'fall' | 'held' | 'snap' | 'placed' | 'leave' | 'splash';
+export type Mode = 'fall' | 'held' | 'snap' | 'placed' | 'leave' | 'splash' | 'reject';
 
 export interface Marble {
   id: number;
@@ -69,6 +85,8 @@ export interface Shelf {
   slots: (Marble | null)[];
   /** Seconds of celebration left. */
   cheer: number;
+  /** Seconds of "wrong shelf" shake left. */
+  shake: number;
 }
 
 export interface Spark {
@@ -82,6 +100,46 @@ export interface Spark {
 
 export type GameState = 'start' | 'play' | 'over';
 
+/** One hand's pinch sample: the distance between thumb and index in hand scales, and the tracker's own pinch flag. */
+export interface PinchSample {
+  dist: number;
+  pinching: boolean;
+}
+
+/**
+ * Decides when a held marble is let go. The hand must be clearly open for OPEN_HOLD seconds, and a lost hand
+ * is waited out for LOSS_HOLD seconds, so flicker and tracking blips never drop a marble.
+ */
+export class PinchHold {
+  private open = 0;
+  private lost = 0;
+
+  reset() {
+    this.open = this.lost = 0;
+  }
+
+  /** `sample` is null when the hand is not tracked. Returns true when the marble should be released. */
+  update(sample: PinchSample | null, dt: number): boolean {
+    if (!sample) {
+      this.open = 0;
+      this.lost += dt;
+      return this.lost >= TUNING.LOSS_HOLD;
+    }
+    this.lost = 0;
+    if (!sample.pinching && sample.dist >= TUNING.PINCH_OPEN) {
+      this.open += dt;
+      return this.open >= TUNING.OPEN_HOLD;
+    }
+    this.open = 0;
+    return false;
+  }
+}
+
+/** True when the fingers are pinched enough to grab. */
+export function isPinched(sample: PinchSample) {
+  return sample.pinching || sample.dist < TUNING.PINCH_CLOSE;
+}
+
 export class SortGame {
   state: GameState = 'start';
   /** Seconds since the current screen appeared. */
@@ -94,8 +152,12 @@ export class SortGame {
   shelves: Shelf[] = [];
   sparks: Spark[] = [];
   held: Marble | null = null;
-  /** Set when a wrong-shelf release bounced, for the scene to flash. */
-  bounceFlash = 0;
+  /** The marble in play (falling, held or on its way to a shelf); the next one waits until it is resolved. */
+  active: Marble | null = null;
+  /** The shelf under the held marble, or -1. */
+  hover = -1;
+  /** True until the first game's first marble has been resolved: it falls extra slowly and the scene shows hints. */
+  firstMarble = true;
   /** Set when a life was lost this frame. */
   lostLife = false;
   W = 1;
@@ -104,10 +166,10 @@ export class SortGame {
   chuteY = 110;
   floorY = 1;
   onOver: ((score: number) => void) | null = null;
-  private nextDrop = 1.5;
+  private nextDrop: number = TUNING.FIRST_DROP;
   private nextId = 0;
-  private lastFamily = -1;
   private target = { x: 0, y: 0 };
+  private firstGame = true;
 
   constructor(private rand: () => number = Math.random) {}
 
@@ -127,8 +189,8 @@ export class SortGame {
       family: k,
       slots: old[k]?.slots ?? new Array(TUNING.SLOTS).fill(null),
       cheer: old[k]?.cheer ?? 0,
+      shake: old[k]?.shake ?? 0,
     }));
-    // Keep placed marbles on their (possibly moved) shelf.
     for (const m of this.marbles) if (m.mode === 'placed' || m.mode === 'snap') this.slotPos(m);
   }
 
@@ -143,7 +205,26 @@ export class SortGame {
     m.y = s.y - this.r;
   }
 
+  /** The tall drop zone of a shelf: the shelf plus the area above it. */
+  zone(s: Shelf) {
+    return {
+      left: s.x - s.w / 2 - TUNING.ZONE_MARGIN,
+      right: s.x + s.w / 2 + TUNING.ZONE_MARGIN,
+      top: s.y - TUNING.ZONE_HEIGHT * this.H,
+      bottom: s.y + this.r * 1.2,
+    };
+  }
+
+  /** Index of the shelf whose zone contains the point, or -1. */
+  zoneAt(x: number, y: number) {
+    return this.shelves.findIndex((s) => {
+      const z = this.zone(s);
+      return x >= z.left && x <= z.right && y >= z.top && y <= z.bottom;
+    });
+  }
+
   start() {
+    this.firstGame = this.firstGame && this.state === 'start';
     this.state = 'play';
     this.screenTime = 0;
     this.score = 0;
@@ -152,20 +233,21 @@ export class SortGame {
     this.marbles = [];
     this.sparks = [];
     this.held = null;
-    this.nextDrop = 1.2;
+    this.active = null;
+    this.hover = -1;
+    this.firstMarble = this.firstGame;
+    this.nextDrop = TUNING.FIRST_DROP;
     for (const s of this.shelves) {
       s.slots.fill(null);
       s.cheer = 0;
+      s.shake = 0;
     }
   }
 
-  /** Current seconds between drops. */
-  interval() {
-    return Math.max(TUNING.MIN_INTERVAL, TUNING.START_INTERVAL - TUNING.SPEEDUP_PER_SEC * this.elapsed);
-  }
-
-  fallSpeed() {
-    return Math.min(TUNING.MAX_FALL, TUNING.START_FALL + TUNING.FALL_SPEEDUP * this.elapsed);
+  /** Fall speed now: slow for the very first marble, then a little faster after every 10 points. */
+  fallSpeed(m?: Marble) {
+    if (this.firstMarble && m && m === this.active) return TUNING.FIRST_FALL;
+    return Math.min(TUNING.MAX_FALL, TUNING.START_FALL + TUNING.SPEEDUP_PER_10 * Math.floor(this.score / 10));
   }
 
   /** True once the start or game over screen accepts input. */
@@ -174,19 +256,17 @@ export class SortGame {
   }
 
   private spawn() {
-    let family = Math.floor(this.rand() * 3);
-    // Avoid long runs of one colour.
-    if (family === this.lastFamily && this.rand() < 0.5) family = (family + 1 + Math.floor(this.rand() * 2)) % 3;
-    this.lastFamily = family;
+    // Any colour, in random order.
+    const family = Math.floor(this.rand() * 3);
     const styles = FAMILIES[family].styles;
-    this.marbles.push({
+    const m: Marble = {
       id: this.nextId++,
       style: styles[Math.floor(this.rand() * styles.length)],
       family,
-      x: this.W / 2 + (this.rand() - 0.5) * this.W * 0.12,
+      x: this.W / 2 + (this.rand() - 0.5) * this.W * 0.1,
       y: this.chuteY + this.r,
-      vx: (this.rand() - 0.5) * 50,
-      vy: 40,
+      vx: (this.rand() - 0.5) * 20,
+      vy: 20,
       angle: this.rand() * 6.28,
       mode: 'fall',
       t: 0,
@@ -195,16 +275,31 @@ export class SortGame {
       shelf: -1,
       slot: -1,
       scale: 1,
-    });
+    };
+    this.marbles.push(m);
+    this.active = m;
+  }
+
+  /** The marble in play is done (placed, lost or rejected): the next one comes after a short pause. */
+  private resolve(m: Marble) {
+    if (this.active !== m) return;
+    this.active = null;
+    this.firstMarble = false;
+    this.nextDrop = TUNING.DROP_DELAY;
   }
 
   // --------------------------------------------------------------- input
+
+  /** Reach for grabbing, in px. */
+  get grabRadius() {
+    return TUNING.GRAB_RADIUS_FACTOR * 2 * this.r;
+  }
 
   /** Grab the nearest falling marble within reach. Returns it, or null. */
   grabAt(x: number, y: number): Marble | null {
     if (this.state !== 'play' || this.held) return null;
     let best: Marble | null = null;
-    let bd = TUNING.GRAB_RADIUS + this.r;
+    let bd = this.grabRadius;
     for (const m of this.marbles) {
       if (m.mode !== 'fall') continue;
       const d = Math.hypot(m.x - x, m.y - y);
@@ -225,67 +320,70 @@ export class SortGame {
     this.target = { x, y };
   }
 
-  /** Let go of the carried marble: onto its shelf, off a wrong shelf, or just down. */
-  release() {
+  /**
+   * Let go of the carried marble. Anywhere in a shelf's zone: the right colour slides into the next free slot,
+   * the wrong one is rejected and costs a life. Outside every zone it simply falls.
+   */
+  release(at?: { x: number; y: number }) {
     const m = this.held;
     if (!m) return;
     this.held = null;
-    const snap = TUNING.SNAP_DISTANCE;
-    let hit: Shelf | null = null;
-    let bd = 1e9;
-    for (const s of this.shelves) {
-      const dx = Math.abs(m.x - s.x);
-      if (dx > s.w / 2 + snap) continue;
-      if (m.y < s.y - 3.4 * this.r - snap || m.y > s.y + snap * 0.6) continue;
-      if (dx < bd) {
-        bd = dx;
-        hit = s;
-      }
+    // A click places the marble exactly where the cursor is.
+    if (at) {
+      m.x = at.x;
+      m.y = at.y;
     }
-    if (hit && hit.family === m.family) {
-      const slot = hit.slots.indexOf(null);
-      if (slot >= 0) {
-        hit.slots[slot] = m;
-        m.mode = 'snap';
-        m.t = 0;
-        m.sx = m.x;
-        m.sy = m.y;
-        m.shelf = this.shelves.indexOf(hit);
-        m.slot = slot;
-        m.vx = m.vy = 0;
-        return;
-      }
-    }
-    m.mode = 'fall';
-    if (hit) {
-      // Wrong shelf (or a full one): bounce off and fall.
-      m.vx = (this.rand() < 0.5 ? -1 : 1) * (130 + this.rand() * 80);
-      m.vy = -280;
-      this.bounceFlash = 0.35;
-    } else {
+    const k = this.zoneAt(m.x, m.y);
+    if (k < 0) {
+      m.mode = 'fall';
       m.vx = 0;
-      m.vy = Math.min(m.vy, 60);
+      m.vy = 0;
+      return;
     }
+    const shelf = this.shelves[k];
+    const slot = shelf.slots.indexOf(null);
+    if (shelf.family === m.family && slot >= 0) {
+      shelf.slots[slot] = m;
+      m.mode = 'snap';
+      m.t = 0;
+      m.sx = m.x;
+      m.sy = m.y;
+      m.shelf = k;
+      m.slot = slot;
+      m.vx = m.vy = 0;
+      this.resolve(m);
+      return;
+    }
+    // Wrong shelf: a small shake, the marble bounces away, and it costs a life.
+    m.mode = 'reject';
+    m.t = 0;
+    m.vx = (this.rand() < 0.5 ? -1 : 1) * 150;
+    m.vy = -240;
+    shelf.shake = 0.45;
+    this.resolve(m);
+    this.loseLife();
   }
 
   // -------------------------------------------------------------- update
 
   update(dt: number) {
     this.screenTime += dt;
-    this.bounceFlash = Math.max(0, this.bounceFlash - dt);
     this.lostLife = false;
     this.updateSparks(dt);
-    for (const s of this.shelves) s.cheer = Math.max(0, s.cheer - dt);
+    for (const s of this.shelves) {
+      s.cheer = Math.max(0, s.cheer - dt);
+      s.shake = Math.max(0, s.shake - dt);
+    }
     if (this.state === 'play') {
       this.elapsed += dt;
-      this.nextDrop -= dt;
-      if (this.nextDrop <= 0) {
-        this.spawn();
-        this.nextDrop = this.interval();
+      if (!this.active) {
+        this.nextDrop -= dt;
+        if (this.nextDrop <= 0) this.spawn();
       }
     }
     for (const m of this.marbles) this.step(m, dt);
-    this.marbles = this.marbles.filter((m) => !(m.mode === 'splash' && m.t >= 1) && !(m.mode === 'leave' && m.t >= 1));
+    this.hover = this.held ? this.zoneAt(this.held.x, this.held.y) : -1;
+    this.marbles = this.marbles.filter((m) => !((m.mode === 'splash' || m.mode === 'leave' || m.mode === 'reject') && m.t >= 1));
     if (this.state === 'play') this.checkShelves();
   }
 
@@ -293,8 +391,9 @@ export class SortGame {
     const r = this.r;
     switch (m.mode) {
       case 'fall': {
-        m.vy = Math.min(m.vy + TUNING.GRAVITY * dt, Math.max(this.fallSpeed(), m.vy < 0 ? 1e9 : 0));
-        m.vx *= Math.exp(-dt * 1.5);
+        const vmax = this.fallSpeed(m);
+        m.vy = Math.min(m.vy + TUNING.GRAVITY * dt, vmax);
+        m.vx *= Math.exp(-dt * 2);
         m.x = Math.min(this.W - r, Math.max(r, m.x + m.vx * dt));
         m.y += m.vy * dt;
         m.angle += (m.vx * dt) / r;
@@ -302,6 +401,7 @@ export class SortGame {
           m.y = this.floorY - r;
           m.mode = 'splash';
           m.t = 0;
+          this.resolve(m);
           if (this.state === 'play') this.loseLife();
         }
         break;
@@ -328,6 +428,14 @@ export class SortGame {
         }
         break;
       }
+      case 'reject':
+        m.t = Math.min(1, m.t + dt / TUNING.REJECT_TIME);
+        m.vy += 700 * dt;
+        m.x += m.vx * dt;
+        m.y += m.vy * dt;
+        m.angle += m.vx * dt * 0.05;
+        m.scale = 1 - m.t * 0.6;
+        break;
       case 'leave':
         m.t = Math.min(1, m.t + dt / 0.6);
         m.y -= 140 * dt;
@@ -353,6 +461,7 @@ export class SortGame {
         this.held = null;
       }
       this.best = Math.max(this.best, this.score);
+      this.firstGame = false;
       this.onOver?.(this.score);
     }
   }
@@ -385,10 +494,5 @@ export class SortGame {
       p.y += p.vy * dt;
     }
     this.sparks = this.sparks.filter((p) => p.life > 0);
-  }
-
-  /** The shelf marble currently on `shelf` slot positions, for drawing. */
-  placedOn(shelf: number) {
-    return this.marbles.filter((m) => m.shelf === shelf && (m.mode === 'placed' || m.mode === 'snap'));
   }
 }

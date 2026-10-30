@@ -1,7 +1,7 @@
 import type { HandSignals } from '../../hands';
 import type { Scene, SceneContext } from '../../scene';
 import { MarbleRenderer } from '../../shared/marbles';
-import { FAMILIES, SortGame, TUNING, type Marble } from './game';
+import { FAMILIES, PinchHold, SortGame, TUNING, isPinched, type Marble } from './game';
 
 const BEST_KEY = 'sort-best';
 /** Colours of the three families, used for confetti and the pattern marks' backdrop. */
@@ -46,19 +46,20 @@ export function familyMark(g: CanvasRenderingContext2D, family: number, x: numbe
 }
 
 interface Hand {
+  /** Whether the fingers were pinched last frame, to spot a fresh pinch. */
   down: boolean;
-  lost: number;
   point: { x: number; y: number } | null;
 }
 
 /** Sort: pinch marbles out of the air and put each on the shelf of its colour family. */
 export class SortScene implements Scene {
-  readonly help = 'Pinch to pick up a marble, move it and let go on the matching shelf. Missed marbles cost a life.';
+  readonly help = 'Pinch to grab a marble, hold it over the shelf with the same colour, open your fingers to drop it. A wrong shelf or a dropped marble costs a life (5 lives).';
 
   private ctx!: SceneContext;
   private game = new SortGame();
   private marbles = new MarbleRenderer();
-  private hands: Record<'L' | 'R', Hand> = { L: { down: false, lost: 0, point: null }, R: { down: false, lost: 0, point: null } };
+  private hands: Record<'L' | 'R', Hand> = { L: { down: false, point: null }, R: { down: false, point: null } };
+  private holds = { L: new PinchHold(), R: new PinchHold() };
   private holder: 'L' | 'R' | 'mouse' | null = null;
   private layoutKey = '';
   private cleanup: (() => void)[] = [];
@@ -107,16 +108,12 @@ export class SortScene implements Scene {
 
   // --------------------------------------------------------------- input
 
-  private press(x: number, y: number, who: 'L' | 'R' | 'mouse') {
-    const game = this.game;
-    if (game.state !== 'play') {
-      if (game.ready) {
-        game.start();
-        this.holder = null;
-      }
-      return;
+  /** Start or restart the game from the start and game over screens. */
+  private startIfReady() {
+    if (this.game.state !== 'play' && this.game.ready) {
+      this.game.start();
+      this.holder = null;
     }
-    if (!game.held && game.grabAt(x, y)) this.holder = who;
   }
 
   private bindInput() {
@@ -125,56 +122,62 @@ export class SortScene implements Scene {
       t.addEventListener(type, fn as EventListener);
       this.cleanup.push(() => t.removeEventListener(type, fn as EventListener));
     };
+    // Mouse: click a marble to pick it up (it then follows the cursor), click again to place it.
     on(canvas, 'pointerdown', (e: PointerEvent) => {
-      this.press(e.offsetX, e.offsetY, 'mouse');
+      const game = this.game;
+      if (game.state !== 'play') {
+        this.startIfReady();
+        return;
+      }
       if (this.holder === 'mouse') {
-        try {
-          canvas.setPointerCapture(e.pointerId);
-        } catch {
-          // Not a live pointer (for example a synthetic event); dragging still works inside the canvas.
-        }
+        game.release({ x: e.offsetX, y: e.offsetY });
+        this.holder = null;
+        canvas.style.cursor = '';
+      } else if (!game.held && game.grabAt(e.offsetX, e.offsetY)) {
+        this.holder = 'mouse';
+        canvas.style.cursor = 'grabbing';
       }
     });
     on(canvas, 'pointermove', (e: PointerEvent) => {
       if (this.holder === 'mouse') this.game.moveHeld(e.offsetX, e.offsetY);
     });
-    const up = () => {
-      if (this.holder === 'mouse') {
-        this.game.release();
-        this.holder = null;
-      }
-    };
-    on(canvas, 'pointerup', up);
-    on(canvas, 'pointercancel', up);
+    this.cleanup.push(() => (canvas.style.cursor = ''));
   }
 
-  /** A pinch near a marble grabs it, it follows the pinch point, and opening the fingers lets go. */
+  /**
+   * Pinch near the marble to grab it. Once held it stays held: it is let go only when the fingers are clearly
+   * open for a moment, and a lost hand is waited out, the marble staying where it was.
+   */
   private readHands(hands: HandSignals, dt: number) {
+    const game = this.game;
     for (const [key, side] of [['L', hands.left], ['R', hands.right]] as const) {
       const st = side.state;
       const h = this.hands[key];
+      const present = st.present && st.landmarks.length > 8;
       h.point = null;
-      if (st.present && st.landmarks.length > 8) {
+      if (present) {
         const a = st.landmarks[4];
         const b = st.landmarks[8];
         h.point = this.ctx.toScreen((a.x + b.x) / 2, (a.y + b.y) / 2);
       }
-      const pinching = !!h.point && st.pinching;
-      if (pinching && h.point) {
-        h.lost = 0;
-        if (!h.down) this.press(h.point.x, h.point.y, key);
-        else if (this.holder === key) this.game.moveHeld(h.point.x, h.point.y);
-        h.down = true;
-      } else {
-        if (this.holder === key) {
-          h.lost += dt;
-          if (h.lost >= TUNING.PINCH_RELEASE_GRACE) {
-            this.game.release();
-            this.holder = null;
-          }
+      const sample = present ? { dist: st.pinchDistance, pinching: st.pinching } : null;
+      const closed = !!sample && isPinched(sample);
+      if (this.holder === key) {
+        if (this.holds[key].update(sample, dt)) {
+          game.release();
+          this.holder = null;
+        } else if (h.point) {
+          game.moveHeld(h.point.x, h.point.y);
         }
-        if (this.holder !== key) h.down = false;
+      } else if (closed && h.point) {
+        if (game.state !== 'play') {
+          if (!h.down) this.startIfReady();
+        } else if (!game.held && game.grabAt(h.point.x, h.point.y)) {
+          this.holder = key;
+          this.holds[key].reset();
+        }
       }
+      h.down = closed;
     }
   }
 
@@ -237,9 +240,23 @@ export class SortScene implements Scene {
     g.lineTo(cx + 24, cy + 6);
     g.stroke();
 
+    // While a marble is held over a shelf's zone, highlight that shelf.
+    if (game.held && game.hover >= 0) {
+      const z = game.zone(game.shelves[game.hover]);
+      g.fillStyle = 'rgba(200,74,18,0.10)';
+      g.strokeStyle = this.orange;
+      g.lineWidth = 3;
+      g.beginPath();
+      g.roundRect(z.left, z.top, z.right - z.left, z.bottom - z.top, 18);
+      g.fill();
+      g.setLineDash([12, 8]);
+      g.stroke();
+      g.setLineDash([]);
+    }
+
     // Shelves, with a label marble and a pattern mark each.
     game.shelves.forEach((s, k) => {
-      const wobble = s.cheer > 0 ? Math.sin(s.cheer * 30) * 2 : 0;
+      const wobble = s.cheer > 0 ? Math.sin(s.cheer * 30) * 2 : s.shake > 0 ? Math.sin(s.shake * 60) * 5 * (s.shake / 0.45) : 0;
       g.strokeStyle = this.orange;
       g.lineWidth = 4;
       g.beginPath();
@@ -285,9 +302,33 @@ export class SortScene implements Scene {
     }
     g.globalAlpha = 1;
 
+    this.drawHint(g);
     this.drawHud(g, d);
     this.drawHands(g);
     if (game.state !== 'play') this.drawScreen(g, W, H);
+  }
+
+  /** First game only: three short hints for the very first marble. */
+  private drawHint(g: CanvasRenderingContext2D) {
+    const game = this.game;
+    const m = game.active;
+    if (game.state !== 'play' || !game.firstMarble || !m) return;
+    let text = 'Pinch to grab it';
+    if (m.mode === 'held') text = game.hover === m.family ? 'Open your fingers to drop' : 'Move it over the matching shelf';
+    else if (m.mode !== 'fall') return;
+    g.font = '500 20px "Clash Grotesk", sans-serif';
+    const w = g.measureText(text).width + 28;
+    const x = Math.min(game.W - w / 2 - 12, Math.max(w / 2 + 12, m.x));
+    const y = Math.max(game.chuteY + 6, m.y - game.r * 2.2);
+    g.fillStyle = this.blue;
+    g.beginPath();
+    g.roundRect(x - w / 2, y - 18, w, 36, 18);
+    g.fill();
+    g.fillStyle = '#dad1ca';
+    g.textAlign = 'center';
+    g.textBaseline = 'middle';
+    g.fillText(text, x, y + 1);
+    g.textBaseline = 'alphabetic';
   }
 
   private drawHud(g: CanvasRenderingContext2D, d: number) {
@@ -349,7 +390,7 @@ export class SortScene implements Scene {
     g.fillStyle = '#121212';
     g.font = '400 22px "Clash Grotesk", sans-serif';
     if (game.state === 'start') {
-      g.fillText('or click · put each marble on the shelf of its colour', W / 2, H * 0.4 + 46);
+      g.fillText('or click · hold each marble over the shelf of its colour', W / 2, H * 0.4 + 46);
     } else {
       g.fillText(`Score ${game.score} · Best ${game.best}`, W / 2, H * 0.4 + 46);
       g.fillText(game.ready ? 'Pinch to play again (or click)' : '', W / 2, H * 0.4 + 82);

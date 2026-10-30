@@ -39,14 +39,14 @@ export function buildHelpCard(sceneId: string, fallback: string): HelpCard {
   if (sceneId === 'sort') {
     const cells = createSortCells();
     const grid = document.createElement('div');
-    grid.className = 'guide-grid three';
+    grid.className = 'guide-grid';
     grid.append(...cells.map((c) => c.el));
     const note = document.createElement('p');
     note.className = 'guide-note';
-    note.textContent = 'No camera? Drag marbles with your mouse.';
+    note.textContent = 'No camera? Click a marble, then click a shelf.';
     note.setAttribute('aria-hidden', 'true');
     el.append(
-      srOnly('Pinch your thumb and index finger to pick up a marble. Move it and let go on the matching shelf. Missed marbles cost a life. No camera? Drag marbles with your mouse.'),
+      srOnly('Pinch your thumb and index finger to grab a marble. Hold it over the shelf with the same colour. Open your fingers to drop it. A wrong shelf or a dropped marble costs a life; you have 5 lives. No camera? Click a marble, then click a shelf.'),
       grid,
       note,
     );
