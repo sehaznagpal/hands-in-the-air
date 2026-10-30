@@ -187,6 +187,7 @@ function syncChrome() {
   chrome.setVisible(!atHome, unlocked);
   badge.hidden = !host.mock || atHome;
   wordmark.hidden = atHome;
+  toggle.hidden = atHome;
   home.setUnlocked(unlocked);
   home.setCamera(tracking);
   syncToggle();
