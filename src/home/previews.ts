@@ -229,5 +229,5 @@ function carWindowPreview() {
 }
 
 export function createPreviews(): Record<string, GuideCell> {
-  return { canvas: canvasPreview(), mesh: meshPreview(), sort: sortPreview(), 'car-window': carWindowPreview() };
+  return { canvas: canvasPreview(), mesh: meshPreview(), sort: sortPreview(), window: carWindowPreview() };
 }

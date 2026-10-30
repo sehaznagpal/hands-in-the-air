@@ -1,0 +1,19 @@
+/* Controls at the top right: background chips and the Fog it up button. */
+.win-ui {
+  position: absolute;
+  top: max(24px, calc(var(--edge) + env(safe-area-inset-top)));
+  right: max(var(--edge), env(safe-area-inset-right));
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 8px;
+  max-width: min(420px, 40vw);
+}
+.win-chips { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 6px; }
+.win-chips .pill, .win-fog { font-size: 14px; line-height: 20px; padding: 3px 12px; }
+.win-chips .pill { background: rgba(236, 230, 223, 0.82); backdrop-filter: blur(4px); }
+.win-chips .pill[aria-pressed='true'] { background: var(--orange); }
+.win-fog { font-size: 14px !important; }
+@media (max-width: 760px) {
+  .win-ui { top: 124px; right: 12px; max-width: calc(100vw - 24px); }
+}

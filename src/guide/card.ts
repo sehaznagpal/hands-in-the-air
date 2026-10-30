@@ -1,6 +1,7 @@
 import type { GuideCell } from './cell';
 import { createCanvasCell } from './canvascell';
 import { createMeshCells } from './meshcells';
+import { createWindowCells } from './windowcells';
 
 export interface HelpCard {
   el: HTMLElement;
@@ -32,6 +33,22 @@ export function buildHelpCard(sceneId: string, fallback: string): HelpCard {
     note.textContent = 'No camera? Drag the mesh with your mouse and use the arrow keys for the number.';
     note.setAttribute('aria-hidden', 'true');
     el.append(srOnly(MESH_SR), grid, note);
+    return { el, cells };
+  }
+  if (sceneId === 'window') {
+    const cells = createWindowCells();
+    const grid = document.createElement('div');
+    grid.className = 'guide-grid three';
+    grid.append(...cells.map((c) => c.el));
+    const note = document.createElement('p');
+    note.className = 'guide-note';
+    note.textContent = 'No camera? Drag with your mouse to wipe.';
+    note.setAttribute('aria-hidden', 'true');
+    el.append(
+      srOnly('Wipe the glass with your open palm. Draw on the window with one finger. Leave it and it fogs up again. No camera? Drag with your mouse to wipe.'),
+      grid,
+      note,
+    );
     return { el, cells };
   }
   if (sceneId === 'canvas') {

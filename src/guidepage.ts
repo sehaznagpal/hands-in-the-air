@@ -1,6 +1,7 @@
 import { GuideCell, guideLoop } from './guide/cell';
 import { createCanvasCell } from './guide/canvascell';
 import { createMeshCells } from './guide/meshcells';
+import { createWindowCells } from './guide/windowcells';
 import { blendPose, FIST, HAND_CENTER, OPEN_PALM, type Pose } from './guide/poses';
 import { drawSkeleton } from './skeleton';
 
@@ -17,6 +18,11 @@ export function showGuide() {
   const orange = css('--orange', '#c54812');
 
   for (const c of createMeshCells()) {
+    cells.push(c);
+    page.append(c.el);
+  }
+
+  for (const c of createWindowCells()) {
     cells.push(c);
     page.append(c.el);
   }

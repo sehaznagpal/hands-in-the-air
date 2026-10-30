@@ -31,6 +31,9 @@ export const FIST: Pose = P([
   [0.22, -0.38], [0.24, -0.5], [0.23, -0.42], [0.21, -0.3],
 ]);
 
+/** One finger pointing: the index stays long, the rest curl as in the fist. */
+export const POINT: Pose = FIST.map((p, i) => (i >= 5 && i <= 8 ? OPEN_PALM[i] : p));
+
 /** Every landmark moves linearly from a to b. */
 export function blendPose(a: Pose, b: Pose, t: number): Pose {
   return a.map((p, i) => ({ x: p.x + (b[i].x - p.x) * t, y: p.y + (b[i].y - p.y) * t }));

@@ -1,5 +1,5 @@
 import { drawSkeleton } from '../skeleton';
-import { blendPose, FIST, HAND_CENTER, OPEN_PALM } from './poses';
+import { blendPose, FIST, HAND_CENTER, OPEN_PALM, type Pose } from './poses';
 import type { State } from './timeline';
 
 const reduced = () => window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false;
@@ -79,8 +79,8 @@ export class GuideCell {
 }
 
 /** Landmark positions in cell pixels for a timeline state; (x, y) is the middle of the hand as a share of the cell. */
-export function handPoints(w: number, h: number, s: State, size = 0.5) {
-  const pose = blendPose(OPEN_PALM, FIST, s.blend);
+export function handPoints(w: number, h: number, s: State, size = 0.5, target: Pose = FIST) {
+  const pose = blendPose(OPEN_PALM, target, s.blend);
   const S = h * size * s.scale;
   const c = Math.cos(s.rotation);
   const n = Math.sin(s.rotation);
@@ -92,10 +92,10 @@ export function handPoints(w: number, h: number, s: State, size = 0.5) {
 }
 
 /** Draw a guide hand from a timeline state. */
-export function drawGuideHand(g: CanvasRenderingContext2D, w: number, h: number, s: State, tip: string, size = 0.5) {
+export function drawGuideHand(g: CanvasRenderingContext2D, w: number, h: number, s: State, tip: string, size = 0.5, target: Pose = FIST) {
   g.save();
   g.globalAlpha = s.alpha;
-  drawSkeleton(g, handPoints(w, h, s, size), tip);
+  drawSkeleton(g, handPoints(w, h, s, size, target), tip);
   g.restore();
 }
 
