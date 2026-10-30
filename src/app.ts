@@ -13,7 +13,6 @@ const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as 
 const canvas = $<HTMLCanvasElement>('stage');
 const video = $<HTMLVideoElement>('video');
 const useMouseBtn = $<HTMLButtonElement>('use-mouse');
-const wordmark = $('wordmark');
 const startBtn = $<HTMLButtonElement>('start');
 const message = $('message');
 const overlay = $('overlay');
@@ -186,7 +185,6 @@ function leaveHome() {
 function syncChrome() {
   chrome.setVisible(!atHome, unlocked);
   badge.hidden = !host.mock || atHome;
-  wordmark.hidden = atHome;
   toggle.hidden = atHome;
   home.setUnlocked(unlocked);
   home.setCamera(tracking);

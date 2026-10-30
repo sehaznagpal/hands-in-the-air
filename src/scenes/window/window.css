@@ -1,19 +1,30 @@
-/* Controls at the top right: background chips and the Fog it up button. */
+/* Controls at the left centre, stacked, where the Mesh Bag controls sit. */
 .win-ui {
   position: absolute;
-  top: max(24px, calc(var(--edge) + env(safe-area-inset-top)));
-  right: max(var(--edge), env(safe-area-inset-right));
+  left: max(var(--edge), env(safe-area-inset-left));
+  top: 50%;
+  translate: 0 -50%;
   display: flex;
   flex-direction: column;
-  align-items: flex-end;
-  gap: 8px;
-  max-width: min(420px, 40vw);
+  align-items: flex-start;
+  gap: 12px;
 }
-.win-chips { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 6px; }
+.win-chips { display: flex; flex-direction: column; align-items: flex-start; gap: 6px; }
 .win-chips .pill, .win-fog { font-size: 14px; line-height: 20px; padding: 3px 12px; }
-.win-chips .pill { background: rgba(236, 230, 223, 0.82); backdrop-filter: blur(4px); }
-.win-chips .pill[aria-pressed='true'] { background: var(--orange); }
-.win-fog { font-size: 14px !important; }
+/* Neutral grey chips; the selected one is blue (orange is only for the active top tab). */
+.win-chips .pill { background: rgba(226, 222, 226, 0.88); backdrop-filter: blur(4px); }
+.win-chips .pill[aria-pressed='true'] { background: var(--blue); color: var(--bg); }
+/* A quiet blue outline button so it does not compete with the selected chip. */
+.win-fog {
+  color: var(--blue);
+  background: rgba(226, 222, 226, 0.5);
+  border: 2px solid var(--blue);
+  box-shadow: none;
+  backdrop-filter: blur(4px);
+}
+.win-fog:hover { background: rgba(226, 222, 226, 0.9); transform: translateY(-2px); }
 @media (max-width: 760px) {
-  .win-ui { top: 124px; right: 12px; max-width: calc(100vw - 24px); }
+  .win-ui { gap: 8px; }
+  .win-chips { gap: 4px; }
+  .win-chips .pill, .win-fog { font-size: 12px; line-height: 16px; padding: 3px 10px; }
 }

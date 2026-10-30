@@ -285,12 +285,12 @@ export class SortScene implements Scene {
     }
     g.globalAlpha = 1;
 
-    this.drawHud(g, W, d);
+    this.drawHud(g, d);
     this.drawHands(g);
     if (game.state !== 'play') this.drawScreen(g, W, H);
   }
 
-  private drawHud(g: CanvasRenderingContext2D, W: number, d: number) {
+  private drawHud(g: CanvasRenderingContext2D, d: number) {
     const game = this.game;
     const edge = parseFloat(css('--edge', '48')) || 48;
     g.textBaseline = 'alphabetic';
@@ -304,8 +304,8 @@ export class SortScene implements Scene {
     g.globalAlpha = 1;
     // Lives as small marbles; a lost one is an empty ring.
     for (let i = 0; i < TUNING.LIVES; i++) {
-      const x = W - edge - 14 - i * 34;
-      const y = game.chuteY - 46;
+      const x = edge + 12 + i * 30;
+      const y = game.chuteY + 86;
       if (i < game.lives) {
         this.marbles.draw(g, { id: 900 + i, x, y, angle: 0 }, 12, 1, d, 0);
       } else {

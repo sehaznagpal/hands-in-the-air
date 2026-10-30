@@ -121,7 +121,7 @@ button:focus-visible { outline: 3px solid var(--blue); outline-offset: 3px; }
 }
 .pill.blue:hover, .pill.round:hover { transform: translateY(-2px); }
 .pill.blue:active, .pill.round:active { transform: scale(0.96); }
-.pill.round { width: 40px; padding: 4px 0; }
+.pill.round { width: 40px; height: 40px; padding: 0; }
 
 /* Camera preview: Figma placeholder is 473x258 in a 1280px frame (37%, aspect 880:480). */
 #preview {
@@ -328,23 +328,6 @@ button:focus-visible { outline: 3px solid var(--blue); outline-offset: 3px; }
   border-radius: 999px;
 }
 
-/* Wordmark: the way back home, top left inside scenes. */
-#wordmark {
-  position: absolute;
-  z-index: 20;
-  top: max(24px, calc(var(--edge) + env(safe-area-inset-top)));
-  left: max(var(--edge), env(safe-area-inset-left));
-  height: 40px;
-  display: flex;
-  align-items: center;
-  font-size: 16px;
-  font-weight: 500;
-  color: var(--ink);
-  text-decoration: none;
-  opacity: 0.85;
-}
-#wordmark:hover { opacity: 1; text-decoration: underline; text-underline-offset: 3px; }
-#wordmark[hidden] { display: none; }
 .pill .soon { margin-left: 6px; font-size: 10px; line-height: 1; letter-spacing: 0.04em; text-transform: uppercase; opacity: 0.7; }
 
 /* Homepage */
@@ -472,7 +455,6 @@ button:focus-visible { outline: 3px solid var(--blue); outline-offset: 3px; }
   .home-start { font-size: 22px; }
   .home-bottom { position: static; flex-direction: column; align-items: center; gap: 6px; margin-top: 24px; }
   .home-foot { font-size: 16px; }
-  #wordmark { top: 14px; left: 16px; height: 24px; font-size: 13px; }
   #scene-toggle { top: 44px; flex-wrap: wrap; justify-content: center; width: calc(100vw - 24px); gap: 6px; }
   #scene-toggle .pill { font-size: 14px; line-height: 24px; padding: 3px 10px; }
 }

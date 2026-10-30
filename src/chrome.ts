@@ -85,6 +85,10 @@ export class Chrome {
     });
 
     this.closeBtn.addEventListener('click', () => this.closeHelp());
+    // Home keeps the camera running: the app routes #home back to the homepage.
+    $('home-btn').addEventListener('click', () => {
+      location.hash = '#home';
+    });
     host.onTrackingChange(() => this.sync());
     this.sync();
   }

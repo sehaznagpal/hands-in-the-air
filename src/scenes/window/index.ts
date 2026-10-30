@@ -64,7 +64,7 @@ export class WindowScene implements Scene {
       row.append(b);
       this.chips.push(b);
     });
-    const fogBtn = el('button', 'pill blue small win-fog', 'Fog it up');
+    const fogBtn = el('button', 'pill small win-fog', 'Fog it up');
     fogBtn.type = 'button';
     fogBtn.title = 'Fog the whole window up again (F)';
     fogBtn.addEventListener('click', () => this.fog.refogAll());
