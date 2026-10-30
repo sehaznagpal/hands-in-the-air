@@ -26,6 +26,8 @@ export class SortScene implements Scene {
   private holds = { L: new PinchHold(), R: new PinchHold() };
   private holder: 'L' | 'R' | 'mouse' | null = null;
   private layoutKey = '';
+  private shownLevel = 1;
+  private levelPulse = 0;
   private cleanup: (() => void)[] = [];
   private orange = '#c84a12';
   private blue = '#0a3699';
@@ -152,6 +154,7 @@ export class SortScene implements Scene {
     this.readHands(hands, dt);
     this.marbles.tick(dt);
     this.game.update(dt);
+    this.levelPulse = Math.max(0, this.levelPulse - dt / 0.9);
   }
 
   private drawMarble(g: CanvasRenderingContext2D, m: Marble, d: number) {
@@ -303,10 +306,12 @@ export class SortScene implements Scene {
     g.textAlign = 'left';
     g.font = '400 44px Atelier, "Clash Grotesk", sans-serif';
     g.fillText(String(game.score), edge, game.chuteY + 38);
+    const scoreW = g.measureText(String(game.score)).width;
     g.font = '14px "Clash Grotesk", sans-serif';
     g.globalAlpha = 0.65;
     g.fillText(`score · best ${game.best}`, edge, game.chuteY + 58);
     g.globalAlpha = 1;
+    this.drawLevel(g, edge + scoreW + 14, game.chuteY + 38);
     // Lives as small marbles; a lost one is an empty ring.
     for (let i = 0; i < TUNING.LIVES; i++) {
       const x = edge + 12 + i * 30;
@@ -323,6 +328,25 @@ export class SortScene implements Scene {
         g.globalAlpha = 1;
       }
     }
+  }
+
+  /** "Level N" beside the score; it pulses for a moment whenever the level goes up. */
+  private drawLevel(g: CanvasRenderingContext2D, x: number, y: number) {
+    const level = this.game.level;
+    if (level !== this.shownLevel) {
+      if (level > this.shownLevel && this.game.state === 'play') this.levelPulse = 1;
+      this.shownLevel = level;
+    }
+    const k = this.levelPulse;
+    g.save();
+    g.translate(x, y);
+    g.scale(1 + 0.25 * k, 1 + 0.25 * k);
+    g.font = '500 16px "Clash Grotesk", sans-serif';
+    g.textAlign = 'left';
+    g.fillStyle = k > 0 ? this.orange : this.blue;
+    g.globalAlpha = 0.75 + 0.25 * k;
+    g.fillText(`Level ${level}`, 0, 0);
+    g.restore();
   }
 
   /** Where each hand's pinch point is, so you can see what you are about to grab. */

@@ -134,15 +134,48 @@ describe('sort game', () => {
     expect(new Set(groups).size).toBe(3);
   });
 
-  it('falls slowly and speeds up only gently after every 10 points', () => {
+  it('keeps the start pace for 10 points, then speeds up every 5 and caps at 2.5x', () => {
     const g = make();
-    const a = g.fallSpeed();
+    g.score = 9;
+    expect(g.level).toBe(1);
+    expect(g.fallSpeed()).toBe(TUNING.START_FALL);
     g.score = 10;
-    const b = g.fallSpeed();
-    g.score = 100;
-    expect(b - a).toBe(TUNING.SPEEDUP_PER_10);
-    expect(g.fallSpeed()).toBeLessThanOrEqual(TUNING.MAX_FALL);
+    expect(g.level).toBe(2);
+    expect(g.fallSpeed()).toBeCloseTo(TUNING.START_FALL * 1.1);
+    expect(g.dropGap).toBeCloseTo(TUNING.DROP_DELAY * 0.9);
+    g.score = 14;
+    expect(g.level).toBe(2);
+    g.score = 15;
+    expect(g.level).toBe(3);
+    g.score = 1000;
+    expect(g.fallSpeed()).toBeCloseTo(TUNING.START_FALL * TUNING.MAX_SPEED_MULT);
+    expect(g.dropGap).toBeGreaterThanOrEqual(TUNING.MIN_DELAY);
     expect(TUNING.FIRST_FALL).toBeLessThan(TUNING.START_FALL);
+  });
+
+  it('allows 1 marble, then 2 from 30 points and 3 from 60', () => {
+    const g = make(4);
+    for (const [score, max] of [[0, 1], [29, 1], [30, 2], [59, 2], [60, 3]]) {
+      g.start();
+      g.score = score;
+      g.lives = 99;
+      for (let i = 0; i < 60 * 12; i++) {
+        g.update(1 / 60);
+        // keep marbles from landing so the count can build up
+        for (const m of g.marbles) if (m.mode === 'fall') m.y = g.chuteY + g.r;
+        expect(g.inPlay.length).toBeLessThanOrEqual(max);
+      }
+      expect(g.inPlay.length).toBe(max);
+    }
+  });
+
+  it('a new game resets the level', () => {
+    const g = make();
+    g.score = 70;
+    expect(g.level).toBeGreaterThan(5);
+    g.start();
+    expect(g.level).toBe(1);
+    expect(g.maxActive).toBe(1);
   });
 });
 

@@ -38,9 +38,19 @@ export const TUNING = {
   /** Fall speed (px/s): the very first marble of the first game, then the normal start speed. */
   FIRST_FALL: 45,
   START_FALL: 80,
-  /** Extra fall speed after every 10 points, and the cap. */
-  SPEEDUP_PER_10: 8,
-  MAX_FALL: 150,
+  /** Progressive speed: the first FLAT_POINTS points stay at the start pace, then every STEP_POINTS points is a new level. */
+  FLAT_POINTS: 10,
+  STEP_POINTS: 5,
+  /** Each level multiplies the fall speed by this and the gap before the next drop by DELAY_FACTOR. */
+  SPEED_FACTOR: 1.1,
+  DELAY_FACTOR: 0.9,
+  /** The fall speed never exceeds this multiple of START_FALL. */
+  MAX_SPEED_MULT: 2.5,
+  /** The gap before the next drop never shrinks below this (s). */
+  MIN_DELAY: 0.4,
+  /** Marbles on screen at once: 1, then 2 from SECOND_AT points, then 3 from THIRD_AT points. */
+  SECOND_AT: 30,
+  THIRD_AT: 60,
   /** Gentle downward acceleration (px/s^2) until the fall speed is reached. */
   GRAVITY: 70,
   /** Seconds a rejected marble bounces away for. */
@@ -162,8 +172,6 @@ export class SortGame {
   shelves: Shelf[] = [];
   sparks: Spark[] = [];
   held: Marble | null = null;
-  /** The marble in play (falling, held or on its way to a shelf); the next one waits until it is resolved. */
-  active: Marble | null = null;
   /** The shelf under the held marble, or -1. */
   hover = -1;
   /** True until the first game's first marble has been resolved: it falls extra slowly and the scene shows hints. */
@@ -176,6 +184,31 @@ export class SortGame {
   chuteY = 110;
   floorY = 1;
   onOver: ((score: number) => void) | null = null;
+  /** Marbles still in play: falling or held. */
+  get inPlay() {
+    return this.marbles.filter((m) => m.mode === 'fall' || m.mode === 'held');
+  }
+
+  /** The oldest marble in play, or null. */
+  get active(): Marble | null {
+    return this.inPlay[0] ?? null;
+  }
+
+  /** The speed level: 1 up to FLAT_POINTS points, then one more for every STEP_POINTS points. */
+  get level() {
+    return this.score < TUNING.FLAT_POINTS ? 1 : 2 + Math.floor((this.score - TUNING.FLAT_POINTS) / TUNING.STEP_POINTS);
+  }
+
+  /** How many marbles may be in play at once. */
+  get maxActive() {
+    return this.score >= TUNING.THIRD_AT ? 3 : this.score >= TUNING.SECOND_AT ? 2 : 1;
+  }
+
+  /** Seconds between a marble being resolved (or dropped) and the next drop. */
+  get dropGap() {
+    return Math.max(TUNING.MIN_DELAY, TUNING.DROP_DELAY * TUNING.DELAY_FACTOR ** (this.level - 1));
+  }
+
   private nextDrop: number = TUNING.FIRST_DROP;
   private nextId = 0;
   private target = { x: 0, y: 0 };
@@ -261,7 +294,6 @@ export class SortGame {
     this.marbles = [];
     this.sparks = [];
     this.held = null;
-    this.active = null;
     this.hover = -1;
     this.firstMarble = this.firstGame;
     this.nextDrop = TUNING.FIRST_DROP;
@@ -273,10 +305,10 @@ export class SortGame {
     this.dealDesigns();
   }
 
-  /** Fall speed now: slow for the very first marble, then a little faster after every 10 points. */
+  /** Fall speed now: slow for the very first marble, then faster with every level, up to the cap. */
   fallSpeed(m?: Marble) {
     if (this.firstMarble && m && m === this.active) return TUNING.FIRST_FALL;
-    return Math.min(TUNING.MAX_FALL, TUNING.START_FALL + TUNING.SPEEDUP_PER_10 * Math.floor(this.score / 10));
+    return TUNING.START_FALL * Math.min(TUNING.MAX_SPEED_MULT, TUNING.SPEED_FACTOR ** (this.level - 1));
   }
 
   /** True once the start or game over screen accepts input. */
@@ -304,15 +336,13 @@ export class SortGame {
       scale: 1,
     };
     this.marbles.push(m);
-    this.active = m;
+    this.nextDrop = this.dropGap;
   }
 
   /** The marble in play is done (placed, lost or rejected): the next one comes after a short pause. */
-  private resolve(m: Marble) {
-    if (this.active !== m) return;
-    this.active = null;
+  private resolve() {
     this.firstMarble = false;
-    this.nextDrop = TUNING.DROP_DELAY;
+    this.nextDrop = this.dropGap;
   }
 
   // --------------------------------------------------------------- input
@@ -378,7 +408,7 @@ export class SortGame {
       m.shelf = k;
       m.slot = slot;
       m.vx = m.vy = 0;
-      this.resolve(m);
+      this.resolve();
       return;
     }
     // A different design: a small shake, the marble bounces away, and it costs a life.
@@ -387,7 +417,7 @@ export class SortGame {
     m.vx = (this.rand() < 0.5 ? -1 : 1) * 150;
     m.vy = -240;
     shelf.shake = 0.45;
-    this.resolve(m);
+    this.resolve();
     this.loseLife();
   }
 
@@ -403,7 +433,7 @@ export class SortGame {
     }
     if (this.state === 'play') {
       this.elapsed += dt;
-      if (!this.active) {
+      if (this.inPlay.length < this.maxActive) {
         this.nextDrop -= dt;
         if (this.nextDrop <= 0) this.spawn();
       }
@@ -428,7 +458,7 @@ export class SortGame {
           m.y = this.floorY - r;
           m.mode = 'splash';
           m.t = 0;
-          this.resolve(m);
+          this.resolve();
           if (this.state === 'play') this.loseLife();
         }
         break;
