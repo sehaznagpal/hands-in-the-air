@@ -89,10 +89,8 @@ export interface Shelf {
   x: number;
   y: number;
   w: number;
-  /** The design this shelf takes, shown by the label marble at its left end. */
+  /** The design this shelf takes, shown by the label marble below it. */
   style: number;
-  /** Centre of the label marble. */
-  labelX: number;
   slots: (Marble | null)[];
   /** Seconds of celebration left. */
   cheer: number;
@@ -210,25 +208,16 @@ export class SortGame {
     this.chuteY = topY;
     this.floorY = H - 20;
     const old = this.shelves;
-    // Three equal units, each: a label marble at the left end, then the shelf.
-    const margin = Math.max(16, W * 0.04);
-    const third = (W - 2 * margin) / 3;
-    const unit = third - 14;
-    const labelW = 2 * this.r + 6;
-    const w = Math.min(TUNING.SLOTS * (2 * this.r + 8) + 24, unit - labelW - 8);
-    this.shelves = [0, 1, 2].map((k) => {
-      const left = margin + third * k + 7;
-      return {
-        x: left + labelW + 6 + w / 2,
-        y: shelfY,
-        w,
-        style: old[k]?.style ?? 0,
-        labelX: left + this.r + 2,
-        slots: old[k]?.slots ?? new Array(TUNING.SLOTS).fill(null),
-        cheer: old[k]?.cheer ?? 0,
-        shake: old[k]?.shake ?? 0,
-      };
-    });
+    const w = Math.min(W * 0.26, TUNING.SLOTS * (2 * this.r + 8) + 24);
+    this.shelves = [0, 1, 2].map((k) => ({
+      x: W * (0.2 + 0.3 * k),
+      y: shelfY,
+      w,
+      style: old[k]?.style ?? 0,
+      slots: old[k]?.slots ?? new Array(TUNING.SLOTS).fill(null),
+      cheer: old[k]?.cheer ?? 0,
+      shake: old[k]?.shake ?? 0,
+    }));
     if (!old.length) this.dealDesigns();
     for (const m of this.marbles) if (m.mode === 'placed' || m.mode === 'snap') this.slotPos(m);
   }
@@ -247,7 +236,7 @@ export class SortGame {
   /** The tall drop zone of a shelf: the shelf plus the area above it. */
   zone(s: Shelf) {
     return {
-      left: s.labelX - this.r - 8,
+      left: s.x - s.w / 2 - TUNING.ZONE_MARGIN,
       right: s.x + s.w / 2 + TUNING.ZONE_MARGIN,
       top: s.y - TUNING.ZONE_HEIGHT * this.H,
       bottom: s.y + this.r * 1.2,

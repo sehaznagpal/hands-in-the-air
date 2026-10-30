@@ -57,12 +57,12 @@ export function createSortCells(): GuideCell[] {
     g.lineWidth = 3;
     g.lineCap = 'round';
     g.beginPath();
-    g.moveTo(w * 0.52, h * 0.8);
+    g.moveTo(w * 0.54, h * 0.8);
     g.lineTo(w * 0.9, h * 0.8);
     g.stroke();
     g.restore();
-    // The label marble sits at the shelf's left end.
-    marble(g, 4, w * 0.54 - h * 0.075, h * 0.8 - h * 0.06, h * 0.06);
+    // The label marble sits below the shelf, centred.
+    marble(g, 4, w * 0.72, h * 0.9, h * 0.06);
   };
 
   // 1. Pinch to grab a marble.

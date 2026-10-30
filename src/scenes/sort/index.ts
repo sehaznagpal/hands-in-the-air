@@ -240,8 +240,8 @@ export class SortScene implements Scene {
         g.stroke();
       }
       g.globalAlpha = 1;
-      // The label marble at the shelf's left end shows which design belongs here.
-      const label: Marble = { id: -1 - k, style: s.style, x: s.labelX, y: s.y - r, vx: 0, vy: 0, angle: 0, mode: 'placed', t: 0, sx: 0, sy: 0, shelf: -1, slot: -1, scale: 1 };
+      // The label marble below the shelf, centred, shows which design belongs here.
+      const label: Marble = { id: -1 - k, style: s.style, x: s.x, y: s.y + r * 2.1, vx: 0, vy: 0, angle: 0, mode: 'placed', t: 0, sx: 0, sy: 0, shelf: -1, slot: -1, scale: 1 };
       this.drawMarble(g, label, d);
       if (s.cheer > 0) {
         g.strokeStyle = this.orange;
