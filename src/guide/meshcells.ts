@@ -4,9 +4,9 @@ import { Timeline } from './timeline';
 const css = (name: string, fallback: string) => getComputedStyle(document.documentElement).getPropertyValue(name).trim() || fallback;
 const clamp01 = (x: number) => Math.min(1, Math.max(0, x));
 const smooth = (x: number) => clamp01(x) * clamp01(x) * (3 - 2 * clamp01(x));
-const HOLD = 0.4;
+export const HOLD = 0.4;
 /** Time in seconds of a point u (0 to 1) through the moving part of a loop. */
-const at = (u: number, duration: number) => HOLD + u * (duration - 2 * HOLD);
+export const at = (u: number, duration: number) => HOLD + u * (duration - 2 * HOLD);
 
 function badge(cell: GuideCell, text: string) {
   const b = document.createElement('span');
@@ -65,7 +65,7 @@ function chip(g: CanvasRenderingContext2D, w: number, n: number) {
 }
 
 /** A tapered diamond-lattice bag outline hanging from (hx, hy), tilted by angle. */
-function miniMesh(g: CanvasRenderingContext2D, hx: number, hy: number, len: number, angle: number, color: string) {
+export function miniMesh(g: CanvasRenderingContext2D, hx: number, hy: number, len: number, angle: number, color: string) {
   const wMax = len * 0.3;
   // Half width along the bag: a narrow neck, a full belly, a rounded bottom.
   const at = (f: number) =>

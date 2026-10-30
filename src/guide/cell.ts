@@ -31,9 +31,12 @@ export class GuideCell {
     frame.className = 'guide-frame';
     this.canvas.setAttribute('aria-hidden', 'true');
     frame.append(this.canvas);
-    const cap = document.createElement('figcaption');
-    cap.textContent = opts.caption;
-    this.el.append(frame, cap);
+    this.el.append(frame);
+    if (opts.caption) {
+      const cap = document.createElement('figcaption');
+      cap.textContent = opts.caption;
+      this.el.append(cap);
+    }
     this.ro = new ResizeObserver(() => {
       this.fit();
       this.draw(opts.staticTime);

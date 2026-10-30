@@ -4,14 +4,16 @@ import { DebugOverlay } from './debug';
 import { HandSignals } from './hands';
 import { MockHands } from './mock';
 import type { Host, Scene, SceneContext } from './scene';
-import { DEFAULT_SCENE, HASH_ALIASES, scenes } from './scenes';
+import { Home } from './home/home';
+import { HASH_ALIASES, scenes } from './scenes';
 import { createTracker, ModelError, type HandTracker } from './tracker';
 import { coverRect } from './view';
 
 const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
 const canvas = $<HTMLCanvasElement>('stage');
 const video = $<HTMLVideoElement>('video');
-const intro = $('intro');
+const useMouseBtn = $<HTMLButtonElement>('use-mouse');
+const wordmark = $('wordmark');
 const startBtn = $<HTMLButtonElement>('start');
 const message = $('message');
 const overlay = $('overlay');
@@ -139,48 +141,54 @@ const sceneCtx: SceneContext = {
 
 let scene: Scene | null = null;
 let sceneIndex = -1;
-/** The welcome screen shows until the camera starts (or "use your mouse" is chosen). */
-let welcome = true;
-/** True once the camera was allowed this visit; unlocks the scene toggle for good. */
+/** The homepage shows until a scene is opened. */
+let atHome = true;
+/** True once the camera was allowed this visit, or mouse mode was chosen; unlocks cards and tabs. */
 let unlocked = false;
 
+const home = new Home(
+  scenes,
+  (i) => go(i),
+  () => home.pulse(),
+);
+
 function setScene(index: number) {
-  if (index < 0 || index >= scenes.length || index === sceneIndex) return;
+  const entry = scenes[index];
+  if (!entry?.create || index === sceneIndex) return;
   scene?.dispose();
   overlay.replaceChildren();
   sceneIndex = index;
-  scene = scenes[index].create();
+  scene = entry.create();
   scene.init(sceneCtx);
-  menu.value = scenes[index].id;
-  chrome.sceneShown(scenes[index].id, scene.help);
+  menu.value = entry.id;
+  chrome.sceneShown(entry.id, scene.help);
   syncToggle();
   syncChrome();
 }
 
-function showWelcome() {
+function showHome() {
   scene?.dispose();
   scene = null;
   sceneIndex = -1;
   overlay.replaceChildren();
-  welcome = true;
-  intro.hidden = false;
-  intro.classList.remove('leaving');
+  atHome = true;
+  home.show();
   syncChrome();
 }
 
-/** Fade the welcome screen out (500 ms) and hand over to the scene. */
-function leaveWelcome() {
-  welcome = false;
-  intro.classList.add('leaving');
-  window.setTimeout(() => {
-    if (!welcome) intro.hidden = true;
-  }, reduced ? 0 : 500);
+/** Leave the homepage for a scene. */
+function leaveHome() {
+  atHome = false;
+  home.hide(reduced);
   syncChrome();
 }
 
 function syncChrome() {
-  chrome.setVisible(!welcome, unlocked);
-  badge.hidden = !host.mock || welcome;
+  chrome.setVisible(!atHome, unlocked);
+  badge.hidden = !host.mock || atHome;
+  wordmark.hidden = atHome;
+  home.setUnlocked(unlocked);
+  home.setCamera(tracking);
   syncToggle();
 }
 
@@ -192,9 +200,15 @@ const toggleButtons = scenes.map((s, i) => {
   b.type = 'button';
   b.className = 'pill';
   b.textContent = s.name;
+  if (s.soon) {
+    const tag = document.createElement('span');
+    tag.className = 'soon';
+    tag.textContent = 'soon';
+    b.append(tag);
+  }
   b.setAttribute('role', 'radio');
   b.addEventListener('click', () => {
-    if (unlocked) go(i);
+    if (unlocked && !s.soon) go(i);
   });
   toggle.appendChild(b);
   return b;
@@ -202,61 +216,61 @@ const toggleButtons = scenes.map((s, i) => {
 
 function syncToggle() {
   toggleButtons.forEach((b, i) => {
-    const on = !welcome && i === sceneIndex;
+    const on = !atHome && i === sceneIndex;
+    const off = !unlocked || !!scenes[i].soon;
     b.setAttribute('aria-checked', String(on));
-    b.setAttribute('aria-disabled', String(!unlocked));
-    if (unlocked) b.removeAttribute('title');
-    else b.title = 'Start the camera first';
-    b.tabIndex = unlocked && (on || (welcome && i === 0)) ? 0 : -1;
+    b.setAttribute('aria-disabled', String(off));
+    if (scenes[i].soon) b.title = 'Coming soon';
+    else if (!unlocked) b.title = 'Turn on the camera first';
+    else b.removeAttribute('title');
+    b.tabIndex = !off && (on || (atHome && i === firstPlayable())) ? 0 : -1;
   });
 }
 
-/** Scene named by the URL hash, or -1. Old hashes are mapped through HASH_ALIASES. */
+const firstPlayable = () => scenes.findIndex((s) => !s.soon);
+
+/** Scene named by the URL hash, or -1 for home. Old hashes are mapped through HASH_ALIASES. */
 function sceneFromUrl() {
   const raw = location.hash.replace(/^#\/?/, '').toLowerCase();
   const hash = HASH_ALIASES[raw] ?? raw;
-  return scenes.findIndex((s) => s.hash === hash);
-}
-
-function defaultScene() {
-  return scenes.findIndex((s) => s.id === DEFAULT_SCENE);
+  return scenes.findIndex((s) => s.hash === hash && !s.soon);
 }
 
 /** Changing the hash adds a history entry, so back and forward just work. */
 function go(index: number) {
   const target = '#' + scenes[index].hash;
-  if (location.hash === target) setScene(index);
+  if (location.hash === target) route();
   else location.hash = target;
 }
 
-function replaceHash(index: number) {
-  history.replaceState(null, '', '#' + scenes[index].hash);
-}
-
-/** Leave the welcome screen for the scene in the URL (or the default one). */
-function enterScenes() {
-  const i = sceneFromUrl() >= 0 ? sceneFromUrl() : defaultScene();
-  replaceHash(i);
-  setScene(i);
-  leaveWelcome();
-}
-
-window.addEventListener('hashchange', () => {
+/** Show what the URL says; scenes need the camera or mouse mode, otherwise the visitor goes home first. */
+function route() {
   const i = sceneFromUrl();
-  if (welcome || i < 0) return;
-  // Without the camera only Mesh Bag works; the other scenes send the visitor back to the start.
-  if (!unlocked && scenes[i].id !== 'mesh') showWelcome();
-  else setScene(i);
-});
+  if (i < 0) {
+    if (!atHome) showHome();
+    return;
+  }
+  if (!unlocked) {
+    history.replaceState(null, '', '#home');
+    if (!atHome) showHome();
+    return;
+  }
+  setScene(i);
+  if (atHome) leaveHome();
+}
+
+window.addEventListener('hashchange', route);
 
 toggle.addEventListener('keydown', (e) => {
   if (!unlocked) return;
-  const n = scenes.length;
+  const playable = scenes.map((sc, i) => (sc.soon ? -1 : i)).filter((i) => i >= 0);
+  const at = Math.max(0, playable.indexOf(sceneIndex));
+  const n = playable.length;
   let next = -1;
-  if (e.key === 'ArrowRight' || e.key === 'ArrowDown') next = (sceneIndex + 1) % n;
-  else if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') next = (sceneIndex - 1 + n) % n;
-  else if (e.key === 'Home') next = 0;
-  else if (e.key === 'End') next = n - 1;
+  if (e.key === 'ArrowRight' || e.key === 'ArrowDown') next = playable[(at + 1) % n];
+  else if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') next = playable[(at - 1 + n) % n];
+  else if (e.key === 'Home') next = playable[0];
+  else if (e.key === 'End') next = playable[n - 1];
   if (next < 0) return;
   e.preventDefault();
   e.stopPropagation(); // scenes use the arrow keys too
@@ -269,7 +283,7 @@ const menu = document.createElement('select');
 menu.className = 'dev-menu';
 menu.hidden = true;
 menu.setAttribute('aria-label', 'Scene');
-for (const s of scenes) menu.add(new Option(s.name, s.id));
+for (const s of scenes) if (!s.soon) menu.add(new Option(s.name, s.id));
 menu.addEventListener('change', () => {
   go(scenes.findIndex((s) => s.id === menu.value));
   menu.blur();
@@ -348,27 +362,36 @@ window.addEventListener('keydown', (e) => {
   if (e.target instanceof HTMLSelectElement || e.metaKey || e.ctrlKey || e.altKey) return;
   if (e.key === 'd' || e.key === 'D') debug.toggle();
   else if (e.key === '`') menu.hidden = !menu.hidden;
-  else if (unlocked && !welcome && e.key >= '1' && Number(e.key) <= scenes.length) go(Number(e.key) - 1);
+  else if (unlocked && !atHome && e.key >= '1' && Number(e.key) <= scenes.length && !scenes[Number(e.key) - 1].soon) go(Number(e.key) - 1);
 });
 
 startBtn.addEventListener('click', async () => {
-  startBtn.disabled = true;
-  startBtn.textContent = 'Starting…';
+  if (tracking) return;
+  home.setBusy(true);
   message.textContent = '';
   const error = await host.startTracking();
-  startBtn.disabled = false;
+  home.setBusy(false);
   if (error) {
+    home.setCamera(false);
     startBtn.textContent = 'Try again';
-    message.textContent = error;
+    // Never leave the visitor stuck: say what happened and point at the mouse link.
+    message.textContent = `${error} Or try it with your mouse below.`;
     return;
   }
-  startBtn.textContent = 'Start your camera to begin';
   unlocked = true;
-  enterScenes();
+  syncChrome();
+});
+
+/** Mouse and keyboard only: unlocks the cards without asking for the camera. */
+useMouseBtn.addEventListener('click', () => {
+  unlocked = true;
+  message.textContent = '';
+  syncChrome();
 });
 
 window.addEventListener('pagehide', () => host.stopTracking());
 
 syncChrome();
+route();
 lastFrame = performance.now();
 rafId = requestAnimationFrame(frame);

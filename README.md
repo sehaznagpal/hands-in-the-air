@@ -1,4 +1,4 @@
-# Hand Lab
+# Throw Your Hands in the Air
 
 A starter for browser scenes you control with your hands through the webcam.
 Static Vite + TypeScript, no framework, plain CSS. Tracking runs locally with
@@ -17,7 +17,9 @@ npm test           # unit tests for the hand signals
 npm run build      # static output in dist/ (works on Vercel as-is)
 ```
 
-The app opens on a welcome screen; **Start your camera to begin** asks for the camera and opens Canvas. Routes: `#canvas` and `#mesh` (the old `#netbag` redirects to `#mesh`); both show the welcome screen first. The toggle at the top is inactive until the camera has been allowed. The camera is shared, so switching scenes never restarts it, and **stop camera** / **start camera** sit bottom left next to the **?** help button. The preview (bottom right) can be minimised to a round button. No camera? Open `/?mock=1` for two simulated hands (`?mock=idle` shows the simulated camera with no hands, handy for layout checks).
+The app opens on a homepage: **Turn on camera to start** asks for the camera, or **No camera? Try it with your mouse** unlocks the cards without one. Pick a card (Canvas, Mesh Bag; Sort and Car Window are coming soon) to open that scene. Routes: `#home` (default), `#canvas` and `#mesh` (the old `#netbag` redirects to `#mesh`). A scene link without camera access or mouse mode goes home first. The camera is shared, so switching scenes never restarts it, and **stop camera** / **start camera** sit bottom left next to the **?** help button. The preview (bottom right) can be minimised to a round button. No camera? Open `/?mock=1` for two simulated hands (`?mock=idle` shows the simulated camera with no hands, handy for layout checks).
+
+Live: https://hands-in-the-air.vercel.app · Repo: https://github.com/sehaznagpal/hands-in-the-air
 
 | Key | Action |
 | --- | --- |

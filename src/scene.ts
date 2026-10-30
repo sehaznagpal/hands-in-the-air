@@ -46,5 +46,7 @@ export interface SceneEntry {
   name: string;
   /** URL hash, e.g. #canvas. */
   hash: string;
-  create(): Scene;
+  /** Not built yet: shown as "coming soon" and not clickable. */
+  soon?: boolean;
+  create?(): Scene;
 }
