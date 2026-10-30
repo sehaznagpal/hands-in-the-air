@@ -139,6 +139,7 @@ export class FogWindow {
   private refogUntil = 0;
   private dripTimer = 3;
   private beadTimer = 0;
+  private tune = 1;
 
   /** Size in CSS pixels. The old wipe mask is carried over. */
   resize(W: number, H: number) {
@@ -162,9 +163,10 @@ export class FogWindow {
     if (this.bg) this.buildFog();
   }
 
-  /** Set the sharp background (already at the right size) and rebuild the fog layer once. */
-  setBackground(bg: HTMLCanvasElement) {
+  /** Set the sharp background (already at the right size) and rebuild the fog layer once. `tune` scales the lightening. */
+  setBackground(bg: HTMLCanvasElement, tune = 1) {
     this.bg = bg;
+    this.tune = tune;
     this.buildFog();
   }
 
@@ -179,7 +181,7 @@ export class FogWindow {
     let sum = 0;
     for (let i = 0; i < px.length; i += 4) sum += 0.3 * px[i] + 0.59 * px[i + 1] + 0.11 * px[i + 2];
     const lum = Math.min(1, sum / (px.length / 4) / 255);
-    const lift = Math.max(0.1, 1 - lum * 2.2);
+    const lift = Math.max(0.1, (1 - lum * 2.2) * this.tune);
     const [fog, fg] = canvas(this.W, this.H);
     fg.imageSmoothingEnabled = true;
     fg.imageSmoothingQuality = 'high';

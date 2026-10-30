@@ -1,6 +1,7 @@
 import { GuideCell, drawGuideHand, handPoints } from '../guide/cell';
 import { at, miniMesh } from '../guide/meshcells';
 import { renderMarble, type MarbleLayers } from '../shared/marbles';
+import { coverImage, DEFAULT_PHOTO_URL, loadPhoto } from '../scenes/window/backgrounds';
 import { Timeline, type State } from '../guide/timeline';
 
 const css = (name: string, fallback: string) => getComputedStyle(document.documentElement).getPropertyValue(name).trim() || fallback;
@@ -157,9 +158,9 @@ function sortPreview() {
   });
 }
 
-// --------------------------------------------------------------- car window
+// ------------------------------------------------------------ foggy window
 
-function carWindowPreview() {
+function foggyWindowPreview() {
   const orange = css('--orange', '#c84a12');
   const D = 6;
   const T0 = 0.7;
@@ -167,7 +168,9 @@ function carWindowPreview() {
   const FOG = 3;
   const path = (s: number) => ({ x: 0.2 + 0.6 * s, y: 0.5 + 0.17 * Math.sin(s * Math.PI * 2.4) });
   let fog: HTMLCanvasElement | null = null;
-  return new GuideCell({
+  // The window shows a tiny, blurred copy of the default photo: drawn small, then scaled up smoothly.
+  let glass: HTMLCanvasElement | null = null;
+  const cell: GuideCell = new GuideCell({
     duration: D,
     staticTime: 2.3,
     caption: '',
@@ -177,10 +180,19 @@ function carWindowPreview() {
       const ww = w * 0.84;
       const wh = h * 0.8;
       // Glass.
-      g.fillStyle = 'rgba(52,68,90,0.9)';
+      g.save();
       g.beginPath();
       g.roundRect(wx, wy, ww, wh, 10);
-      g.fill();
+      g.clip();
+      if (glass) {
+        g.imageSmoothingEnabled = true;
+        g.imageSmoothingQuality = 'high';
+        g.drawImage(glass, wx, wy, ww, wh);
+      } else {
+        g.fillStyle = 'rgba(52,68,90,0.9)';
+        g.fillRect(wx, wy, ww, wh);
+      }
+      g.restore();
       // Fog with a clear streak that slowly fogs over again.
       if (!fog || fog.width !== Math.round(ww) || fog.height !== Math.round(wh)) {
         fog = document.createElement('canvas');
@@ -190,7 +202,7 @@ function carWindowPreview() {
       const f = fog.getContext('2d')!;
       f.globalCompositeOperation = 'source-over';
       f.clearRect(0, 0, fog.width, fog.height);
-      f.fillStyle = 'rgba(232,238,244,0.94)';
+      f.fillStyle = 'rgba(232,238,244,0.66)';
       f.fillRect(0, 0, fog.width, fog.height);
       f.globalCompositeOperation = 'destination-out';
       f.lineCap = 'round';
@@ -226,8 +238,18 @@ function carWindowPreview() {
       lightHand(g, w, h, still(s.x, s.y, { alpha, rotation: 0.15 }), orange, 0.5);
     },
   });
+  void loadPhoto(DEFAULT_PHOTO_URL).then((img) => {
+    if (!img) return;
+    const c = document.createElement('canvas');
+    c.width = 56;
+    c.height = 27;
+    coverImage(c.getContext('2d')!, img, 56, 27);
+    glass = c;
+    cell.drawStatic();
+  });
+  return cell;
 }
 
 export function createPreviews(): Record<string, GuideCell> {
-  return { canvas: canvasPreview(), mesh: meshPreview(), sort: sortPreview(), window: carWindowPreview() };
+  return { canvas: canvasPreview(), mesh: meshPreview(), sort: sortPreview(), window: foggyWindowPreview() };
 }

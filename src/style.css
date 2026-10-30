@@ -356,6 +356,13 @@ button:focus-visible { outline: 3px solid var(--blue); outline-offset: 3px; }
   text-align: center;
   animation: fade-up 500ms ease both;
 }
+/* The hero group sits ~5vh higher than its natural spot; the picker and footer do not move. */
+.home-hero {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  translate: 0 -5vh;
+}
 #home-title {
   margin: 0;
   font: 400 min(6.2vw, 9.4vh) / 1.02 var(--font-display);

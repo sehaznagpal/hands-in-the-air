@@ -23,7 +23,7 @@ function el<K extends keyof HTMLElementTagNameMap>(tag: K, cls: string, text?: s
   return e;
 }
 
-/** Car Window: a fogged night-time window that you wipe clear with your hands or the mouse. */
+/** Foggy Window: a fogged window over a photo that you wipe clear with your hands or the mouse. */
 export class WindowScene implements Scene {
   readonly help = 'Wipe the glass with your palm, draw with one finger, or leave it and it fogs up again.';
 
@@ -94,7 +94,7 @@ export class WindowScene implements Scene {
     g.fillRect(0, 0, w, h);
     await bg.paint(g, w, h);
     if (token !== this.bgToken) return;
-    this.fog.setBackground(c);
+    this.fog.setBackground(c, bg.fog);
     this.ready = true;
   }
 
