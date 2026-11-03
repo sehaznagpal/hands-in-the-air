@@ -328,8 +328,8 @@ function bloomPreview() {
       g.fillRect(0, 0, w, h);
       const ledgeTop = h * 0.7;
       drawLedge(g, pal, 0, ledgeTop, w, h - ledgeTop);
-      const u = Math.min(w / 5.3, (ledgeTop - 6) / 3.1);
-      const pitch = u * 1.9;
+      const u = Math.min(w / 3.9, (ledgeTop - 6) / 3.1);
+      const pitch = u * 1.2;
       const xs = VASE_IDS.map((_, k) => w / 2 + (k - 1) * pitch);
       // A plant's bloom is the most the hand gave it in the last 1.5 seconds, closing as that fades.
       blooms.fill(0);

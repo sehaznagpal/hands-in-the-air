@@ -72,13 +72,13 @@ export interface Row {
 }
 
 /**
- * Five vases in a row, centred, at least one vase width apart (a bit closer on a phone). The ledge fills the lower
+ * Five vases in a row, centred, standing close together like a still life. The ledge fills the lower
  * third of the picture. `top` keeps the tallest plant clear of the tabs.
  */
 export function layoutRow(W: number, H: number, top: number): Row {
   const phone = W < 640;
-  const edge = phone ? 12 : 48;
-  const pitchU = phone ? 1.5 : 2.05;
+  const edge = phone ? 10 : 48;
+  const pitchU = 1.2;
   const ledgeTop = H * (phone ? 0.62 : 0.72);
   const baseY = ledgeTop + 0.1 * Math.min(W / 9, H / 6);
   const u = Math.max(14, Math.min((W - 2 * edge) / (4 * pitchU + 1), (baseY - top) / 3.25));
@@ -136,6 +136,23 @@ function inked(g: CanvasRenderingContext2D, fill: string, path: () => void, off 
   g.fillStyle = fill;
   path();
   g.fill();
+}
+
+/** Like `inked`, for a vase made of several overlapping pieces: all the back copies first, then all the fronts, so no stray edges show inside. */
+function inkedAll(g: CanvasRenderingContext2D, fill: string, paths: (() => void)[], off = 0.016) {
+  g.save();
+  g.translate(off, off * 0.7);
+  g.fillStyle = shade(fill, 0.3);
+  for (const p of paths) {
+    p();
+    g.fill();
+  }
+  g.restore();
+  g.fillStyle = fill;
+  for (const p of paths) {
+    p();
+    g.fill();
+  }
 }
 
 /** A polygon whose corners wobble a little, for hand-cut edges. */
@@ -409,9 +426,9 @@ const VASE: VaseSpec[] = [
     // Round pink belly with wavy orange lines and a cream lip
     mouth: 1.2,
     draw(g, pal) {
-      const belly = () => jag(g, ellipsePts(0, -0.52, 0.5, 0.54, 34, 2), 2, 0.006);
-      inked(g, pal.pink, belly);
-      inked(g, pal.pink, () => jag(g, [[-0.13, -1.1], [0.13, -1.1], [0.19, -0.8], [-0.19, -0.8]], 3));
+      const belly = () => jag(g, ellipsePts(0, -0.52, 0.5, 0.54, 64, 2), 2, 0.004);
+      const neck = () => jag(g, [[-0.13, -1.1], [0.13, -1.1], [0.15, -0.95], [0.3, -0.85], [-0.3, -0.85], [-0.15, -0.95]], 3, 0.004);
+      inkedAll(g, pal.pink, [belly, neck]);
       g.save();
       belly();
       g.clip();
@@ -469,10 +486,10 @@ const VASE: VaseSpec[] = [
     // Small blue bowl with a cream rim and a foot
     mouth: 0.32,
     draw(g, pal) {
-      inked(g, pal.blue, () => jag(g, [[-0.14, 0], [0.14, 0], [0.16, -0.06], [-0.16, -0.06]], 7));
-      inked(g, pal.blue, () => {
-        jag(g, ellipsePts(0, -0.32, 0.38, 0.3, 28, 8).filter(([, y]) => y >= -0.32), 8, 0.005);
-      });
+      inkedAll(g, pal.blue, [
+        () => jag(g, [[-0.14, 0], [0.14, 0], [0.16, -0.06], [-0.16, -0.06]], 7, 0.004),
+        () => jag(g, ellipsePts(0, -0.32, 0.38, 0.3, 40, 8).filter(([, y]) => y >= -0.32), 8, 0.004),
+      ]);
       g.fillStyle = pal.cream;
       g.fillRect(-0.38, -0.34, 0.76, 0.05);
     },
