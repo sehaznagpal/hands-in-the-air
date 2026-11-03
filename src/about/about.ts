@@ -1,6 +1,8 @@
 import type { GuideCell } from '../guide/cell';
 import { guideLoop } from '../guide/cell';
 import type { SceneEntry } from '../scene';
+import { drawSkeleton } from '../skeleton';
+import hands from './sehaz-hands.json';
 import { createPreviews } from './previews';
 
 /** Card titles always sit on two lines; this is where each one breaks. */
@@ -12,6 +14,76 @@ const TITLE_LINES: Record<string, [string, string]> = {
   eyes: ['My Eyes', 'Follow You'],
   mesh: ['Mesh Bag', 'Marbles'],
 };
+
+/** Where the photo is anchored inside its 16:9 frame; the same value as `object-position` in the stylesheet. */
+const PHOTO_FOCUS_Y = 0.79;
+
+/**
+ * The photo with the hand skeleton over it, drawn like the live camera preview. The landmarks were found once by
+ * the hand landmarker (see sehaz-hands.json); the fingertip dots pulse gently.
+ */
+function startPhotoSkeleton(canvas: HTMLCanvasElement, img: HTMLImageElement) {
+  const g = canvas.getContext('2d')!;
+  const reduced = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false;
+  const orange = getComputedStyle(document.documentElement).getPropertyValue('--orange').trim() || '#c54812';
+  let raf = 0;
+  let visible = false;
+
+  const draw = (now: number) => {
+    const dpr = Math.min(window.devicePixelRatio || 1, 2);
+    const w = canvas.clientWidth;
+    const h = canvas.clientHeight;
+    if (!w || !h || !img.naturalWidth) return;
+    if (canvas.width !== Math.round(w * dpr) || canvas.height !== Math.round(h * dpr)) {
+      canvas.width = Math.round(w * dpr);
+      canvas.height = Math.round(h * dpr);
+    }
+    g.setTransform(dpr, 0, 0, dpr, 0, 0);
+    g.clearRect(0, 0, w, h);
+    // The same cover fit as the picture itself.
+    const k = Math.max(w / img.naturalWidth, h / img.naturalHeight);
+    const dw = img.naturalWidth * k;
+    const dh = img.naturalHeight * k;
+    const ox = (w - dw) / 2;
+    const oy = (h - dh) * PHOTO_FOCUS_Y;
+    const pulse = reduced ? 0 : 0.5 + 0.5 * Math.sin(now / 420);
+    for (const hand of hands) {
+      const pts = hand.map(([x, y]) => ({ x: ox + x * dw, y: oy + y * dh }));
+      drawSkeleton(g, pts, orange);
+      // A soft ring around each fingertip that breathes in and out.
+      g.fillStyle = orange;
+      g.globalAlpha = 0.18 + 0.22 * (1 - pulse);
+      for (const i of [4, 8, 12, 16, 20]) {
+        g.beginPath();
+        g.arc(pts[i].x, pts[i].y, 6 + 4 * pulse, 0, Math.PI * 2);
+        g.fill();
+      }
+      g.globalAlpha = 1;
+    }
+  };
+  const loop = (now: number) => {
+    draw(now);
+    raf = visible && !reduced ? requestAnimationFrame(loop) : 0;
+  };
+  const kick = () => {
+    if (visible && !raf) raf = requestAnimationFrame(loop);
+    else if (!visible) {
+      cancelAnimationFrame(raf);
+      raf = 0;
+    }
+  };
+  new ResizeObserver(() => draw(performance.now())).observe(canvas);
+  img.addEventListener('load', () => draw(performance.now()));
+  if ('IntersectionObserver' in window) {
+    new IntersectionObserver((r) => {
+      visible = r.some((x) => x.isIntersecting);
+      kick();
+    }).observe(canvas);
+  } else {
+    visible = true;
+    kick();
+  }
+}
 
 /** The About page: the text and one card per game, each with a looping preview. */
 export class About {
@@ -25,6 +97,7 @@ export class About {
     entries: SceneEntry[],
     private onPick: (entry: SceneEntry) => void,
   ) {
+    startPhotoSkeleton(document.getElementById('about-skeleton') as HTMLCanvasElement, document.getElementById('about-img') as HTMLImageElement);
     const previews = createPreviews();
     for (const entry of entries) {
       const li = document.createElement('li');

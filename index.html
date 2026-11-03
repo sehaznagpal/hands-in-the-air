@@ -26,7 +26,7 @@
           <p id="message" role="status" aria-live="polite"></p>
         </div>
         <div class="welcome-bottom">
-          <p class="welcome-foot">by sehaz nagpal</p>
+          <a class="welcome-foot" href="https://portfolio-sehaznagpal.vercel.app" target="_blank" rel="noopener">by sehaz nagpal</a>
           <button id="welcome-about" class="pill round" type="button" aria-label="About">i</button>
         </div>
       </section>
@@ -35,7 +35,18 @@
         <a id="about-back" class="about-back" href="#welcome">&larr; Back</a>
         <div class="about-inner">
           <h1 id="about-title" class="display">ABOUT</h1>
-          <p class="about-text">Throw Your Hands in the Air turns your webcam into a controller. It uses hand tracking, a computer vision technique that finds 21 points on each of your hands, built on Google's open-source MediaPipe. It runs right inside your browser and follows your fingers in real time, so you can wipe, pinch, grab and wave your way through a few playful experiments. It's safe to use. Nothing here is recorded or uploaded, there's no backend, and your video never leaves your computer. I made this to play with what hands can do on a screen, and built it with the help of AI. Pick any game below to begin, and if it's your first time, start with the warm up.</p>
+          <div class="about-intro">
+            <p class="about-text">Throw Your Hands in the Air turns your webcam into a controller. It uses hand tracking, a computer vision technique that finds 21 points on each of your hands, built on Google's open-source MediaPipe. It runs right inside your browser and follows your fingers in real time, so you can wipe, pinch, grab and wave your way through a few playful experiments. It's safe to use. Nothing here is recorded or uploaded, there's no backend, and your video never leaves your computer. I made this to play with what hands can do on a screen, and built it with the help of AI. Pick any game below to begin, and if it's your first time, start with the warm up.</p>
+            <div class="about-person">
+              <a class="about-photo" href="https://portfolio-sehaznagpal.vercel.app" target="_blank" rel="noopener" aria-label="Sehaz Nagpal's portfolio">
+                <div class="photo-frame">
+                  <img id="about-img" src="/about/sehaz.jpg" alt="Sehaz Nagpal, smiling, sitting outdoors" />
+                  <canvas id="about-skeleton" aria-hidden="true"></canvas>
+                </div>
+              </a>
+              <a class="about-by" href="https://portfolio-sehaznagpal.vercel.app" target="_blank" rel="noopener">by sehaz nagpal &#8599;</a>
+            </div>
+          </div>
           <ul id="about-cards" class="about-cards"></ul>
         </div>
       </section>
