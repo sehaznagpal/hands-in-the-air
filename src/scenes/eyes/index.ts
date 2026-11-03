@@ -48,7 +48,12 @@ interface Rig {
   head: SVGElement[];
   /** Applies the tilt to the head and the pupils. */
   tilt: boolean;
+  /** Close-up only: parts of the face that drift toward the gaze, the nearer ones (deeper) more than the hair. */
+  drift: { el: SVGElement; depth: number }[];
 }
+
+/** How far (SVG units) the nearest features of the close-up face drift toward where she looks. */
+const DRIFT = { x: 14, y: 9 };
 
 const bbox = (e: SVGGraphicsElement) => e.getBBox();
 
@@ -117,7 +122,17 @@ function rigFace(host: HTMLElement): Rig {
     };
   };
   const brows = [...svg.querySelectorAll<SVGElement>('[id^="eyebrows"]')];
-  return { view: 'in', host, eyes: { left: make('left'), right: make('right') }, brows, head: [], tilt: false };
+  const eyes = { left: make('left'), right: make('right') };
+  // Depth: hair and ears sit behind the face, the face and cheeks in the middle, the features in front.
+  const drift: Rig['drift'] = [];
+  const add = (el: Element | null, depth: number) => el && drift.push({ el: el as SVGElement, depth });
+  svg.querySelectorAll('[id^="hair"], [id^="ears"], [id^="earrings"]').forEach((e) => add(e, 0.35));
+  add(svg.querySelector('#face'), 1);
+  svg.querySelectorAll('[id^="blush"]').forEach((e) => add(e, 1));
+  for (const id of ['nose', 'mouth']) add(svg.querySelector('#' + id), 1.5);
+  brows.forEach((b) => add(b, 1.5));
+  for (const side of ['left', 'right'] as const) eyes[side].startle.forEach((n) => add(n, 1.5));
+  return { view: 'in', host, eyes, brows, head: [], tilt: false, drift };
 }
 
 /** Builds the rig of the full-body figure: dot eyes that move over the face, a lid, and a head that tilts. */
@@ -164,7 +179,7 @@ function rigBody(host: HTMLElement): Rig {
       gy: 0,
     };
   };
-  return { view: 'out', host, eyes: { left: make(pupils[0]), right: make(pupils[1]) }, brows: [], head, tilt: true };
+  return { view: 'out', host, eyes: { left: make(pupils[0]), right: make(pupils[1]) }, brows: [], head, tilt: true, drift: [] };
 }
 
 /**
@@ -320,6 +335,11 @@ export class EyesScene implements Scene {
         // Face: the eyes widen a little. The pupil group scales with its clip.
         const s = 1 + 0.16 * pop;
         for (const n of e.startle) n.setAttribute('transform', `translate(${e.cx} ${e.cy}) scale(${s.toFixed(3)}) translate(${-e.cx} ${-e.cy})`);
+      }
+      if (rig.drift.length) {
+        const gx = (rig.eyes.left.gx + rig.eyes.right.gx) / 2;
+        const gy = (rig.eyes.left.gy + rig.eyes.right.gy) / 2;
+        for (const { el, depth } of rig.drift) el.style.translate = `${(gx * DRIFT.x * depth).toFixed(2)}px ${(gy * DRIFT.y * depth).toFixed(2)}px`;
       }
       for (const b of rig.brows) b.setAttribute('transform', `translate(0 ${(-9 * pop).toFixed(2)})`);
     }
