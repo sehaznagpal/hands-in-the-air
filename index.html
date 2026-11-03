@@ -18,20 +18,25 @@
 
       <nav id="scene-toggle" role="radiogroup" aria-label="Scene"></nav>
 
-      <section id="home" aria-labelledby="home-title">
-        <div class="home-inner">
-          <div class="home-hero">
-          <h1 id="home-title"><span class="l1">THROW YOUR HANDS</span> <span class="l2">IN THE AIR!</span></h1>
-          <p class="home-sub">(to do random cool things.)</p>
-          <button id="start" class="home-start" type="button">Turn on camera to start</button>
+      <section id="welcome" aria-labelledby="welcome-title">
+        <div class="welcome-hero">
+          <h1 id="welcome-title" class="display"><span class="l1">THROW YOUR HANDS</span> <span class="l2">IN THE AIR!</span></h1>
+          <p class="welcome-sub">(to do random cool things.)</p>
+          <button id="start" class="welcome-start" type="button">Turn on camera to start</button>
           <p id="message" role="status" aria-live="polite"></p>
-          </div>
-          <p class="home-choose">CHOOSE ONE TO START.</p>
-          <ul id="home-cards" class="home-cards"></ul>
         </div>
-        <div class="home-bottom">
-          <button id="use-mouse" class="home-link" type="button">No camera? Try it with your mouse</button>
-          <p class="home-foot">by sehaz nagpal</p>
+        <div class="welcome-bottom">
+          <p class="welcome-foot">by sehaz nagpal</p>
+          <button id="welcome-about" class="pill round" type="button" aria-label="About">i</button>
+        </div>
+      </section>
+
+      <section id="about" aria-labelledby="about-title" hidden>
+        <a id="about-back" class="about-back" href="#welcome">&larr; Back</a>
+        <div class="about-inner">
+          <h1 id="about-title" class="display">ABOUT</h1>
+          <p class="about-text">Throw Your Hands in the Air turns your webcam into a controller. It uses hand tracking, a computer vision technique that finds 21 points on each of your hands, built on Google's open-source MediaPipe. It runs right inside your browser and follows your fingers in real time, so you can wipe, pinch, grab and wave your way through a few playful experiments. It's safe to use. Nothing here is recorded or uploaded, there's no backend, and your video never leaves your computer. I made this to play with what hands can do on a screen, and built it with the help of AI. Pick any game below to begin, and if it's your first time, start with the warm up.</p>
+          <ul id="about-cards" class="about-cards"></ul>
         </div>
       </section>
 
@@ -50,8 +55,8 @@
           <button id="help-close" class="help-close" type="button" aria-label="Close help">×</button>
           <div id="help-body"></div>
         </div>
-        <button id="home-btn" class="pill round" type="button" aria-label="Home"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3.5 11.2 12 4l8.5 7.2"/><path d="M5.8 9.8V20h12.4V9.8"/><path d="M10 20v-5.5h4V20"/></svg></button>
         <button id="help-btn" class="pill round" type="button" aria-label="Help" aria-expanded="false" aria-controls="help-card">?</button>
+        <button id="about-btn" class="pill round" type="button" aria-label="About">i</button>
         <button id="cam-btn" class="pill blue" type="button">stop camera</button>
         <p id="dock-status" role="status" aria-live="polite"></p>
       </div>

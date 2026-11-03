@@ -19,7 +19,7 @@ const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as 
 
 /**
  * App-level UI shared by every scene: the camera preview (and its minimise button),
- * the bottom-left "?" and stop/start camera buttons, and the help card.
+ * the bottom-left "?", "i" and stop/start camera buttons, and the help card.
  */
 export class Chrome {
   private preview = $('preview');
@@ -47,6 +47,8 @@ export class Chrome {
   private auto = false;
   private suppressed = false;
   private autoTimer = 0;
+  /** Called after the camera was stopped with the button; the app then returns to the welcome page. */
+  onStopCamera: (() => void) | null = null;
   private reduced = window.matchMedia?.('(prefers-reduced-motion: reduce)').matches ?? false;
 
   constructor(
@@ -85,10 +87,6 @@ export class Chrome {
     });
 
     this.closeBtn.addEventListener('click', () => this.closeHelp());
-    // Home keeps the camera running: the app routes #home back to the homepage.
-    $('home-btn').addEventListener('click', () => {
-      location.hash = '#home';
-    });
     host.onTrackingChange(() => this.sync());
     this.sync();
   }
@@ -183,6 +181,7 @@ export class Chrome {
     if (this.busy) return;
     if (this.host.tracking) {
       this.host.stopTracking();
+      this.onStopCamera?.();
       return;
     }
     this.busy = true;

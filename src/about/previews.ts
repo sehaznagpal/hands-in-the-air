@@ -250,6 +250,68 @@ function foggyWindowPreview() {
   return cell;
 }
 
+// ------------------------------------------------------------------- eyes
+
+/** The close-up face with its pupils taken out, and the eye and pupil outlines so the pupils can be drawn moving. */
+async function loadFace() {
+  const text = await (await fetch('/characters/face.svg')).text();
+  const doc = new DOMParser().parseFromString(text, 'image/svg+xml');
+  const path = (id: string) => new Path2D(doc.getElementById(id)?.getAttribute('d') ?? '');
+  const eyes = { left: path('eye-left'), right: path('eye-right') };
+  const pupils = { left: path('pupil-left'), right: path('pupil-right') };
+  doc.getElementById('pupil-left')?.remove();
+  doc.getElementById('pupil-right')?.remove();
+  const url = URL.createObjectURL(new Blob([new XMLSerializer().serializeToString(doc)], { type: 'image/svg+xml' }));
+  const img = new Image();
+  img.src = url;
+  await img.decode();
+  return { img, eyes, pupils };
+}
+
+/** The zoomed-in face, her pupils following a small moving hand. */
+function eyesPreview() {
+  let face: Awaited<ReturnType<typeof loadFace>> | null = null;
+  void loadFace().then((f) => (face = f)).catch(() => {});
+  const D = 6;
+  const handAt = (t: number) => {
+    const a = (t / D) * Math.PI * 2;
+    return { x: 0.5 + 0.34 * Math.sin(a), y: 0.5 + 0.2 * Math.sin(2 * a + 1) };
+  };
+  // The crop of the 736 x 736 picture that shows both eyes.
+  const SX = 128;
+  const SY = 410;
+  const SW = 460;
+  return new GuideCell({
+    duration: D,
+    staticTime: 1.2,
+    caption: '',
+    render: (g, w, h, t) => {
+      const f = face;
+      const hp = handAt(t);
+      if (f) {
+        const k = w / SW;
+        g.save();
+        g.scale(k, k);
+        g.translate(-SX, -SY);
+        g.drawImage(f.img, 0, 0, 736, 736);
+        for (const side of ['left', 'right'] as const) {
+          // The pupil moves toward the hand but stays inside the eye.
+          const dx = (hp.x - 0.5) * 2 * 22;
+          const dy = (hp.y - 0.5) * 2 * 4;
+          g.save();
+          g.clip(f.eyes[side]);
+          g.translate(dx + 20, dy);
+          g.fillStyle = '#000';
+          g.fill(f.pupils[side]);
+          g.restore();
+        }
+        g.restore();
+      }
+      lightHand(g, w, h, still(hp.x, 0.5 + (hp.y - 0.5) * 0.9 + 0.2), css('--orange', '#c84a12'), 0.42);
+    },
+  });
+}
+
 export function createPreviews(): Record<string, GuideCell> {
-  return { canvas: canvasPreview(), mesh: meshPreview(), sort: sortPreview(), window: foggyWindowPreview() };
+  return { canvas: canvasPreview(), mesh: meshPreview(), sort: sortPreview(), window: foggyWindowPreview(), eyes: eyesPreview() };
 }

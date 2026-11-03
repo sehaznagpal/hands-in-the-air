@@ -1,0 +1,21 @@
+/* The character fills the space between the tabs and the bottom edge; the two views crossfade. */
+.eyes-stage {
+  position: absolute;
+  left: 50%;
+  top: 84px;
+  bottom: 28px;
+  width: min(calc(100vw - 2 * var(--edge)), 940px);
+  translate: -50% 0;
+  pointer-events: none;
+}
+.eyes-view {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  transition: opacity 450ms ease;
+}
+.eyes-view.on { opacity: 1; }
+.eyes-view svg { width: 100%; height: 100%; display: block; }
+@media (max-width: 640px) {
+  .eyes-stage { top: 64px; bottom: calc(max(var(--edge), env(safe-area-inset-bottom)) + 56px); }
+}

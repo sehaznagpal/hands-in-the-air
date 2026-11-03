@@ -343,7 +343,7 @@ export class SortScene implements Scene {
     g.scale(1 + 0.25 * k, 1 + 0.25 * k);
     g.font = '500 16px "Clash Grotesk", sans-serif';
     g.textAlign = 'left';
-    g.fillStyle = k > 0 ? this.orange : this.blue;
+    g.fillStyle = this.blue;
     g.globalAlpha = 0.75 + 0.25 * k;
     g.fillText(`Level ${level}`, 0, 0);
     g.restore();

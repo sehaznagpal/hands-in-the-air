@@ -17,14 +17,14 @@ npm test           # unit tests for the hand signals
 npm run build      # static output in dist/ (works on Vercel as-is)
 ```
 
-The app opens on a homepage: **Turn on camera to start** asks for the camera, or **No camera? Try it with your mouse** unlocks the cards without one. Pick a card (Canvas, Mesh Bag, Sort, Foggy Window) to open that scene. Routes: `#home` (default), `#canvas` and `#mesh` (the old `#netbag` redirects to `#mesh`). A scene link without camera access or mouse mode goes home first. The camera is shared, so switching scenes never restarts it, and **stop camera** / **start camera** sit bottom left next to the **?** help button. The preview (bottom right) can be minimised to a round button. No camera? Open `/?mock=1` for two simulated hands (`?mock=idle` shows the simulated camera with no hands, handy for layout checks).
+The app opens on a **welcome page**: **Turn on camera to start** asks for the camera and opens **Warm Up: Canvas** (if the camera is blocked it opens in mouse mode instead). The round **i** button opens **About** (`#about`): what the app is, and a card for each game (**Warm Up: Canvas**, **Foggy Window**, **Sorting Game**, **My Eyes Follow You**, **Mesh Bag Marbles**; **Blooming Flowers** is coming later). Routes: `#welcome` (default), `#about`, `#canvas`, `#window`, `#sort`, `#eyes` and `#mesh` (the old `#netbag` redirects to `#mesh`). A game link without camera access or mouse mode goes to the welcome page first. The camera is shared, so switching games never restarts it. Bottom left, in a game: **?** (help), **i** (About) and **stop camera**, which also returns to the welcome page. The preview (bottom right, always 16:9, `--preview-w` in `src/style.css`) can be minimised to a round button. No camera? Open `/?mock=1` for two simulated hands (`?mock=idle` shows the simulated camera with no hands, handy for layout checks).
 
 Live: https://hands-in-the-air.vercel.app · Repo: https://github.com/sehaznagpal/hands-in-the-air
 
 | Key | Action |
 | --- | --- |
 | `D` | Debug overlay: skeleton, fingertip ids 1-10, FPS, detection time, live signals |
-| `1` `2` `3` | Switch scene (also the toggle at the top centre; arrow keys work inside it) |
+| `1`-`5` | Switch game (also the tabs at the top centre; arrow keys work inside them) |
 | `` ` `` | Hidden dev menu (scene picker). `?scene=<id>` also works |
 
 ## Theme
@@ -65,7 +65,7 @@ thumb to pinky.
    }
    ```
 
-2. Register it in `src/scenes/index.ts`. Keys `1`-`3` pick the first three.
+2. Register it in `src/scenes/index.ts`; its tab and its About card follow the order there.
 3. Use `ctx.toScreen(x, y)` to turn hand coordinates into canvas pixels. Put DOM UI in
    `ctx.overlay`. Give the scene a `help` string for the help card. The camera is
    owned by the app; read `ctx.host.tracking` and `ctx.previewRect()` to lay out around the preview.
@@ -76,7 +76,7 @@ thumb to pinky.
 a slow vertical slide and an occasional swipe) running through the same signal
 pipeline. Use it for testing and as a fallback demo.
 
-## Scene: mesh bag
+## Mesh Bag Marbles (`#mesh`)
 
 A hanging orange mesh bag that holds 0 to 25 balls. The bag lengthens and bulges to
 match the count, swings from its hook like a pendulum, and the balls slosh inside.
@@ -120,6 +120,10 @@ unit-tested headless: `npm test`.
 
 A fogged window over a photo. An open palm wipes wide, one extended finger draws a thin line (both hands at once); the mouse drags to wipe and Shift draws thin. Wiped glass fogs over again in about 20 seconds, with condensation beads, edge beads and now and then a drip. `F` or **Fog it up** re-fogs everything; `B` / `Shift+B` or the options on the left switch the photo (Neon city, Nature, Calm city), shown cover-fit and centred. The photos are `public/backgrounds/neon-city.webp`, `nature.webp` and `calm-city.webp`; any other `.jpg`, `.jpeg` or `.webp` you drop in that folder becomes an extra option after restarting `npm run dev` (or rebuilding). The fog lightening is tuned per photo (`fog` in `src/scenes/window/backgrounds.ts`). The code is in `src/scenes/window/`: the mask, fog layer, beads and drips are in `fog.ts`.
 
-## Sort (`#sort`)
+## Sorting Game (`#sort`)
 
 A gentle endless game: one marble at a time floats down from a chute, and you put it on the shelf that has the same marble. Each shelf shows one design as a label marble below it, centred; only designs that are on a shelf drop, and the three shelf designs always look clearly different (they come from different groups in `DESIGN_GROUPS`). Pinch thumb and index near the marble to grab it; once held it stays held until the fingers are clearly open for 200 ms, and a lost hand is waited out for 600 ms. Release anywhere in a shelf's tall drop zone and the right marble slides into the next free slot (5 per shelf); a different design bounces off and costs a life. With the mouse, click a marble to pick it up and click again to place it. A marble that reaches the floor also costs a life; you have 5, and the game runs until they are gone. A full shelf pays +5, clears and takes a new design. The next marble comes 1.5 s after the last one is placed or lost, and the first game's first marble falls extra slowly with hints. The best score is kept in `localStorage`. Every tuning number is in the `TUNING` block at the top of `src/scenes/sort/game.ts`; the game logic has no DOM and is played by a bot in `game.test.ts`. The marble drawing is shared with Mesh Bag in `src/shared/marbles.ts`.
+
+## My Eyes Follow You (`#eyes`)
+
+A girl whose eyes follow your hands (`src/scenes/eyes/`). Her pupils follow the palm of the nearest hand, smoothed, and never leave the eye (the pupil is clipped to the white of the eye). With two hands each eye follows a different one, crossed over, so she goes cross-eyed. She blinks every 3 to 6 seconds with a lid in her skin colour, looks slowly around when no hand is in view, and is startled (eyes widen, brows lift; a small jump zoomed out) when a hand comes very close. With no camera the eyes follow the mouse and a click startles her. **ZOOM IN** is the close-up face (`public/characters/face.svg`), **ZOOM OUT** the whole girl with a slight head tilt toward the hand (`public/characters/body.svg`); the two crossfade. The pictures are exported from the Figma file; the animated layers are the SVG ids `pupil-left`, `pupil-right`, and (face only) `eye-left`, `eye-right`. The tuning numbers are the `TUNING` block in `src/scenes/eyes/look.ts`.

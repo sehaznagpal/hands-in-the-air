@@ -1,15 +1,21 @@
 import type { SceneEntry } from '../scene';
 import { CanvasScene } from './canvas';
+import { EyesScene } from './eyes';
 import { MeshScene } from './mesh';
 import { SortScene } from './sort';
 import { WindowScene } from './window';
 
-/** Add a scene here. The toggle and the homepage cards list them all, in this order. */
+/**
+ * Every game, in the order of the cards on the About page. The tabs list the playable ones in this order;
+ * entries marked `soon` only show as a muted card.
+ */
 export const scenes: SceneEntry[] = [
-  { id: 'canvas', name: 'Canvas', hash: 'canvas', create: () => new CanvasScene() },
-  { id: 'mesh', name: 'Mesh Bag', hash: 'mesh', create: () => new MeshScene() },
-  { id: 'sort', name: 'Sort', hash: 'sort', create: () => new SortScene() },
+  { id: 'canvas', name: 'Warm Up: Canvas', hash: 'canvas', create: () => new CanvasScene() },
   { id: 'window', name: 'Foggy Window', hash: 'window', create: () => new WindowScene() },
+  { id: 'sort', name: 'Sorting Game', hash: 'sort', create: () => new SortScene() },
+  { id: 'flowers', name: 'Blooming Flowers', hash: 'flowers', soon: true },
+  { id: 'eyes', name: 'My Eyes Follow You', hash: 'eyes', create: () => new EyesScene() },
+  { id: 'mesh', name: 'Mesh Bag Marbles', hash: 'mesh', create: () => new MeshScene() },
 ];
 
 /** Old hashes that still work. */

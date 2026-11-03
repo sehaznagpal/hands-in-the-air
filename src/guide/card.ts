@@ -68,6 +68,21 @@ export function buildHelpCard(sceneId: string, fallback: string): HelpCard {
     );
     return { el, cells };
   }
+  if (sceneId === 'eyes') {
+    const lines = ['Move your hand and she watches it', 'Show two hands and each eye picks one', 'Get close and she\'ll notice'];
+    const list = document.createElement('ul');
+    list.className = 'help-lines';
+    for (const text of lines) {
+      const li = document.createElement('li');
+      li.textContent = text;
+      list.append(li);
+    }
+    const note = document.createElement('p');
+    note.className = 'guide-note';
+    note.textContent = 'No camera? Move your mouse.';
+    el.append(list, note);
+    return { el, cells: [] };
+  }
   if (sceneId === 'canvas') {
     const cell = createCanvasCell(fallback);
     cell.el.classList.add('guide-wide');
