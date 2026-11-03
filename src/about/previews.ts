@@ -3,8 +3,8 @@ import { at, miniMesh } from '../guide/meshcells';
 import { renderMarble, type MarbleLayers } from '../shared/marbles';
 import { coverImage, DEFAULT_PHOTO_URL, loadPhoto } from '../scenes/window/backgrounds';
 import { Timeline, type State } from '../guide/timeline';
-import { COLS, ROWS, drawBed, drawFlower, drawGrain, gardenPalette, headPos, layoutGarden } from '../scenes/bloom/flowers';
-import { targetBloom, TUNING } from '../scenes/bloom/logic';
+import { TUNING, vaseTargets } from '../scenes/bloom/logic';
+import { drawGrain, drawLedge, drawVase, vasePalette } from '../scenes/bloom/vases';
 
 const css = (name: string, fallback: string) => getComputedStyle(document.documentElement).getPropertyValue(name).trim() || fallback;
 const clamp01 = (x: number) => Math.min(1, Math.max(0, x));
@@ -312,41 +312,38 @@ function eyesPreview() {
 
 // ------------------------------------------------------------------- bloom
 
-/** A mini garden bed: a hand glides across it, flowers open under it and close behind it. */
+/** Three vases on a ledge: a hand glides across and each plant blooms as it passes, then closes behind it. */
 function bloomPreview() {
-  const pal = gardenPalette();
+  const pal = vasePalette();
   const D = 6;
-  // The hand sweeps along the bed, going up and down across the rows.
-  const handAt = (t: number) => {
-    const u = (t % D) / D;
-    return { x: 0.12 + 0.76 * u, y: 0.5 + 0.2 * Math.sin(u * Math.PI * 4) };
-  };
+  const VASE_IDS = [2, 1, 4];
+  const handAt = (t: number) => 0.12 + 0.76 * (0.5 - 0.5 * Math.cos((((t % D) + D) % D) / D * Math.PI * 2));
+  const blooms = [0, 0, 0];
   return new GuideCell({
     duration: D,
-    staticTime: 2.4,
+    staticTime: 3.0,
     caption: '',
     render: (g, w, h, t) => {
-      const l = layoutGarden({ x: w * 0.04, y: h * 0.04, w: w * 0.92, h: h * 0.92 });
-      // A flower's bloom is the best opening the hand gave it in the last 1.5 seconds, closing as that fades.
-      for (let i = 0; i < ROWS * COLS; i++) {
-        const head = headPos(l, i);
-        let bloom = 0;
-        for (let s = 0; s <= TUNING.CLOSE_TIME; s += 0.1) {
-          const hp = handAt(t - s);
-          const open = targetBloom(Math.hypot(hp.x * w - head.x, hp.y * h - head.y), l.cell);
-          bloom = Math.max(bloom, open * (1 - s / TUNING.CLOSE_TIME));
-        }
-        flowers[i] = bloom;
+      g.fillStyle = pal.bg;
+      g.fillRect(0, 0, w, h);
+      const ledgeTop = h * 0.7;
+      drawLedge(g, pal, 0, ledgeTop, w, h - ledgeTop);
+      const u = Math.min(w / 5.3, (ledgeTop - 6) / 3.1);
+      const pitch = u * 1.9;
+      const xs = VASE_IDS.map((_, k) => w / 2 + (k - 1) * pitch);
+      // A plant's bloom is the most the hand gave it in the last 1.5 seconds, closing as that fades.
+      blooms.fill(0);
+      for (let s = 0; s <= TUNING.CLOSE_TIME; s += 0.1) {
+        const open = vaseTargets(xs, [handAt(t - s) * w]);
+        open.forEach((o, i) => (blooms[i] = Math.max(blooms[i], o * (1 - s / TUNING.CLOSE_TIME))));
       }
-      drawBed(g, l, pal);
-      for (let i = 0; i < ROWS * COLS; i++) drawFlower(g, l, pal, i, { bloom: flowers[i], lean: 0 });
-      drawGrain(g, l);
-      const hp = handAt(t);
-      lightHand(g, w, h, still(hp.x, hp.y + 0.12), css('--orange', '#c84a12'), 0.42);
+      VASE_IDS.forEach((id, k) => drawVase(g, pal, id, xs[k], ledgeTop + 0.1 * u, u, blooms[k], 0));
+      drawGrain(g, 0, 0, w, h);
+      const hx = handAt(t);
+      lightHand(g, w, h, still(hx, 0.74), css('--orange', '#c84a12'), 0.4);
     },
   });
 }
-const flowers = new Array<number>(ROWS * COLS).fill(0);
 
 export function createPreviews(): Record<string, GuideCell> {
   return { canvas: canvasPreview(), mesh: meshPreview(), sort: sortPreview(), window: foggyWindowPreview(), eyes: eyesPreview(), bloom: bloomPreview() };

@@ -1,13 +1,18 @@
 import { describe, expect, it } from 'vitest';
-import { pinchTarget, stepBloom, targetBloom, TUNING } from './logic';
+import { nearestVase, pinchVase, stepBloom, TUNING, vaseTargets } from './logic';
+
+const xs = [100, 300, 500, 700, 900];
 
 describe('bloom logic', () => {
-  it('opens within 0.6 cells, closed beyond 1.5 cells', () => {
-    expect(targetBloom(0, 100)).toBe(1);
-    expect(targetBloom(60, 100)).toBe(1);
-    expect(targetBloom(150, 100)).toBe(0);
-    expect(targetBloom(105, 100)).toBeGreaterThan(0);
-    expect(targetBloom(105, 100)).toBeLessThan(1);
+  it('the nearest vase opens fully and its neighbours a little', () => {
+    expect(nearestVase(xs, 330)).toBe(1);
+    expect(vaseTargets(xs, [330])).toEqual([TUNING.NEIGHBOUR, 1, TUNING.NEIGHBOUR, 0, 0]);
+    expect(vaseTargets(xs, [100])).toEqual([1, TUNING.NEIGHBOUR, 0, 0, 0]);
+  });
+
+  it('two hands open two vases at once, and no hand opens none', () => {
+    expect(vaseTargets(xs, [100, 900])).toEqual([1, TUNING.NEIGHBOUR, 0, TUNING.NEIGHBOUR, 1]);
+    expect(vaseTargets(xs, [])).toEqual([0, 0, 0, 0, 0]);
   });
 
   it('closes from fully open in about 1.5 seconds', () => {
@@ -29,11 +34,8 @@ describe('bloom logic', () => {
     expect(b).toBeGreaterThan(0.99);
   });
 
-  it('a pinch picks the nearest open flower, or a kept one, and ignores buds', () => {
-    const heads = [{ x: 0, y: 0 }, { x: 100, y: 0 }];
-    expect(pinchTarget(heads, [0.1, 0.9], [false, false], 20, 0, 100)).toBe(1);
-    expect(pinchTarget(heads, [0.1, 0.1], [false, false], 20, 0, 100)).toBe(-1);
-    expect(pinchTarget(heads, [0, 0], [true, false], 20, 0, 100)).toBe(0);
-    expect(pinchTarget(heads, [1, 1], [false, false], 500, 500, 100)).toBe(-1);
+  it('a pinch picks the vase it is over, and nothing far from any vase', () => {
+    expect(pinchVase(xs, 320, 200)).toBe(1);
+    expect(pinchVase(xs, 1500, 200)).toBe(-1);
   });
 });

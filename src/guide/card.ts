@@ -70,7 +70,7 @@ export function buildHelpCard(sceneId: string, fallback: string): HelpCard {
   }
   const LISTS: Record<string, { lines: string[]; note: string }> = {
     eyes: { lines: ['Move your hand and she watches it', 'Show two hands and each eye picks one', "Get close and she'll notice"], note: 'No camera? Move your mouse.' },
-    bloom: { lines: ['Move your hand over the garden to bloom flowers', 'Move away and they close back into buds', 'Pinch a flower to keep it open'], note: 'No camera? Hover to bloom, click to keep.' },
+    bloom: { lines: ['Move your hand left and right to bloom a vase', 'Move away and it closes back', 'Pinch to keep it blooming'], note: 'No camera? Hover to bloom, click to keep.' },
   };
   const list = LISTS[sceneId];
   if (list) {
