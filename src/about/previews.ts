@@ -3,6 +3,8 @@ import { at, miniMesh } from '../guide/meshcells';
 import { renderMarble, type MarbleLayers } from '../shared/marbles';
 import { coverImage, DEFAULT_PHOTO_URL, loadPhoto } from '../scenes/window/backgrounds';
 import { Timeline, type State } from '../guide/timeline';
+import { COLS, ROWS, drawBed, drawFlower, drawGrain, gardenPalette, headPos, layoutGarden } from '../scenes/bloom/flowers';
+import { targetBloom, TUNING } from '../scenes/bloom/logic';
 
 const css = (name: string, fallback: string) => getComputedStyle(document.documentElement).getPropertyValue(name).trim() || fallback;
 const clamp01 = (x: number) => Math.min(1, Math.max(0, x));
@@ -252,73 +254,100 @@ function foggyWindowPreview() {
 
 // ------------------------------------------------------------------- eyes
 
-/** The close-up face with its pupils taken out, and the eye and pupil outlines so the pupils can be drawn moving. */
-async function loadFace() {
-  const text = await (await fetch('/characters/face.svg')).text();
+/** The zoomed-out figure with her pupils taken out, and the pupil outlines so they can be drawn moving. */
+async function loadFigure() {
+  const text = await (await fetch('/characters/body.svg')).text();
   const doc = new DOMParser().parseFromString(text, 'image/svg+xml');
-  const path = (id: string) => new Path2D(doc.getElementById(id)?.getAttribute('d') ?? '');
-  const eyes = { left: path('eye-left'), right: path('eye-right') };
-  const round = (id: string) => {
+  const pupils = ['pupil-left', 'pupil-right'].map((id) => {
     const e = doc.getElementById(id)!;
-    const n = (k: string) => Number(e.getAttribute(k));
-    const p = new Path2D();
-    p.ellipse(n('cx'), n('cy'), n('rx'), n('ry'), 0, 0, Math.PI * 2);
+    const p = new Path2D(e.getAttribute('d') ?? '');
+    e.remove();
     return p;
-  };
-  const pupils = { left: round('pupil-left'), right: round('pupil-right') };
-  doc.getElementById('pupil-left')?.remove();
-  doc.getElementById('pupil-right')?.remove();
+  });
   const url = URL.createObjectURL(new Blob([new XMLSerializer().serializeToString(doc)], { type: 'image/svg+xml' }));
   const img = new Image();
   img.src = url;
   await img.decode();
-  return { img, eyes, pupils };
+  return { img, pupils };
 }
 
-/** The zoomed-in face, her pupils following a small moving hand. */
+/** The whole girl, her pupils following a small moving hand. */
 function eyesPreview() {
-  let face: Awaited<ReturnType<typeof loadFace>> | null = null;
-  void loadFace().then((f) => (face = f)).catch(() => {});
+  let fig: Awaited<ReturnType<typeof loadFigure>> | null = null;
+  void loadFigure().then((f) => (fig = f)).catch(() => {});
   const D = 6;
   const handAt = (t: number) => {
     const a = (t / D) * Math.PI * 2;
-    return { x: 0.5 + 0.34 * Math.sin(a), y: 0.5 + 0.2 * Math.sin(2 * a + 1) };
+    return { x: 0.5 + 0.36 * Math.sin(a), y: 0.5 + 0.2 * Math.sin(2 * a + 1) };
   };
-  // The crop of the 736 x 736 picture that shows both eyes.
-  const SX = 128;
-  const SY = 410;
-  const SW = 460;
+  // The crop of the 736 x 977 picture that shows her head, in a 2:1 frame.
+  const SX = 205;
+  const SY = 150;
+  const SW = 300;
   return new GuideCell({
     duration: D,
     staticTime: 1.2,
     caption: '',
     render: (g, w, h, t) => {
-      const f = face;
+      const f = fig;
       const hp = handAt(t);
       if (f) {
-        const k = w / SW;
         g.save();
-        g.scale(k, k);
+        g.scale(w / SW, w / SW);
         g.translate(-SX, -SY);
-        g.drawImage(f.img, 0, 0, 736, 736);
-        for (const side of ['left', 'right'] as const) {
-          // The pupil moves toward the hand but stays inside the eye.
-          const dx = (hp.x - 0.5) * 2 * 22;
-          const dy = (hp.y - 0.5) * 2 * 4;
+        g.drawImage(f.img, 0, 0, 736, 977);
+        g.fillStyle = '#000';
+        for (const p of f.pupils) {
           g.save();
-          g.clip(f.eyes[side]);
-          g.translate(dx, dy);
-          g.fillStyle = '#000';
-          g.fill(f.pupils[side]);
+          g.translate((hp.x - 0.5) * 2 * 14, (hp.y - 0.5) * 2 * 8);
+          g.fill(p);
           g.restore();
         }
         g.restore();
       }
-      lightHand(g, w, h, still(hp.x, 0.5 + (hp.y - 0.5) * 0.9 + 0.2), css('--orange', '#c84a12'), 0.42);
+      lightHand(g, w, h, still(hp.x, 0.78 + (hp.y - 0.5) * 0.3), css('--orange', '#c84a12'), 0.42);
     },
   });
 }
 
+// ------------------------------------------------------------------- bloom
+
+/** A mini garden bed: a hand glides across it, flowers open under it and close behind it. */
+function bloomPreview() {
+  const pal = gardenPalette();
+  const D = 6;
+  // The hand sweeps along the bed, going up and down across the rows.
+  const handAt = (t: number) => {
+    const u = (t % D) / D;
+    return { x: 0.12 + 0.76 * u, y: 0.5 + 0.2 * Math.sin(u * Math.PI * 4) };
+  };
+  return new GuideCell({
+    duration: D,
+    staticTime: 2.4,
+    caption: '',
+    render: (g, w, h, t) => {
+      const l = layoutGarden({ x: w * 0.04, y: h * 0.04, w: w * 0.92, h: h * 0.92 });
+      // A flower's bloom is the best opening the hand gave it in the last 1.5 seconds, closing as that fades.
+      for (let i = 0; i < ROWS * COLS; i++) {
+        const head = headPos(l, i);
+        let bloom = 0;
+        for (let s = 0; s <= TUNING.CLOSE_TIME; s += 0.1) {
+          const hp = handAt(t - s);
+          const open = targetBloom(Math.hypot(hp.x * w - head.x, hp.y * h - head.y), l.cell);
+          bloom = Math.max(bloom, open * (1 - s / TUNING.CLOSE_TIME));
+        }
+        flowers[i] = bloom;
+      }
+      drawBed(g, l, pal);
+      for (let i = 0; i < ROWS * COLS; i++) drawFlower(g, l, pal, i, { bloom: flowers[i], lean: 0 });
+      drawGrain(g, l);
+      const hp = handAt(t);
+      lightHand(g, w, h, still(hp.x, hp.y + 0.12), css('--orange', '#c84a12'), 0.42);
+    },
+  });
+}
+const flowers = new Array<number>(ROWS * COLS).fill(0);
+
 export function createPreviews(): Record<string, GuideCell> {
-  return { canvas: canvasPreview(), mesh: meshPreview(), sort: sortPreview(), window: foggyWindowPreview(), eyes: eyesPreview() };
+  return { canvas: canvasPreview(), mesh: meshPreview(), sort: sortPreview(), window: foggyWindowPreview(), eyes: eyesPreview(), bloom: bloomPreview() };
 }

@@ -508,3 +508,7 @@ button:focus-visible { outline: 3px solid var(--blue); outline-offset: 3px; }
 .help-lines { list-style: none; margin: 22px 0 0; padding: 0; display: grid; gap: 8px; font-size: 16px; line-height: 1.3; }
 .help-lines li { padding: 10px 14px; background: var(--grey); border-radius: 12px; }
 #help-card:has(.help-lines) { width: min(380px, calc(100vw - 2 * var(--edge))); }
+
+/* Blooming Flowers: the Reset button sits under the bed. */
+.bloom-reset { position: absolute; translate: -50% 0; font-size: 20px; line-height: 28px; padding: 4px 18px; }
+.bloom-reset[hidden] { display: none; }

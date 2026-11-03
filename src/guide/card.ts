@@ -68,19 +68,23 @@ export function buildHelpCard(sceneId: string, fallback: string): HelpCard {
     );
     return { el, cells };
   }
-  if (sceneId === 'eyes') {
-    const lines = ['Move your hand and she watches it', 'Show two hands and each eye picks one', 'Get close and she\'ll notice'];
-    const list = document.createElement('ul');
-    list.className = 'help-lines';
-    for (const text of lines) {
+  const LISTS: Record<string, { lines: string[]; note: string }> = {
+    eyes: { lines: ['Move your hand and she watches it', 'Show two hands and each eye picks one', "Get close and she'll notice"], note: 'No camera? Move your mouse.' },
+    bloom: { lines: ['Move your hand over the garden to bloom flowers', 'Move away and they close back into buds', 'Pinch a flower to keep it open'], note: 'No camera? Hover to bloom, click to keep.' },
+  };
+  const list = LISTS[sceneId];
+  if (list) {
+    const ul = document.createElement('ul');
+    ul.className = 'help-lines';
+    for (const text of list.lines) {
       const li = document.createElement('li');
       li.textContent = text;
-      list.append(li);
+      ul.append(li);
     }
     const note = document.createElement('p');
     note.className = 'guide-note';
-    note.textContent = 'No camera? Move your mouse.';
-    el.append(list, note);
+    note.textContent = list.note;
+    el.append(ul, note);
     return { el, cells: [] };
   }
   if (sceneId === 'canvas') {

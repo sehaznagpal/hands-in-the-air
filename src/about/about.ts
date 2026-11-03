@@ -8,49 +8,10 @@ const TITLE_LINES: Record<string, [string, string]> = {
   canvas: ['Warm Up:', 'Canvas'],
   window: ['Foggy', 'Window'],
   sort: ['Sorting', 'Game'],
-  flowers: ['Blooming', 'Flowers'],
+  bloom: ['Blooming', 'Flowers'],
   eyes: ['My Eyes', 'Follow You'],
   mesh: ['Mesh Bag', 'Marbles'],
 };
-
-/** Closed buds for the game that is coming later. */
-function budsPreview(): HTMLElement {
-  const frame = document.createElement('div');
-  frame.className = 'guide-frame buds';
-  frame.setAttribute('aria-hidden', 'true');
-  const c = document.createElement('canvas');
-  frame.append(c);
-  const draw = () => {
-    const w = (c.width = frame.clientWidth || 1);
-    const h = (c.height = frame.clientHeight || 1);
-    const g = c.getContext('2d')!;
-    g.clearRect(0, 0, w, h);
-    const cs = getComputedStyle(document.documentElement);
-    const blue = cs.getPropertyValue('--blue').trim() || '#0a3699';
-    [[0.25, 0.62, 0.26], [0.5, 0.5, 0.34], [0.75, 0.66, 0.22]].forEach(([x, y, s]) => {
-      const px = x * w;
-      const py = y * h;
-      const r = s * h * 0.42;
-      g.strokeStyle = '#7a8a5c';
-      g.lineWidth = 2;
-      g.beginPath();
-      g.moveTo(px, h + 2);
-      g.quadraticCurveTo(px + r * 0.5, (py + h) / 2, px, py + r * 0.9);
-      g.stroke();
-      g.fillStyle = '#c9a3b4';
-      g.beginPath();
-      g.ellipse(px, py, r * 0.62, r, 0, 0, Math.PI * 2);
-      g.fill();
-      g.strokeStyle = blue;
-      g.globalAlpha = 0.35;
-      g.lineWidth = 1.5;
-      g.stroke();
-      g.globalAlpha = 1;
-    });
-  };
-  new ResizeObserver(draw).observe(frame);
-  return frame;
-}
 
 /** The About page: the text and one card per game, each with a looping preview. */
 export class About {
@@ -75,8 +36,6 @@ export class About {
       if (cell) {
         cell.el.setAttribute('aria-hidden', 'true');
         card.append(cell.el);
-      } else if (entry.soon) {
-        card.append(budsPreview());
       }
       const [a, b] = TITLE_LINES[entry.id] ?? [entry.name, ''];
       const title = document.createElement('h2');

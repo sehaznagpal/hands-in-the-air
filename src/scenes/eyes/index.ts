@@ -194,7 +194,7 @@ export class EyesScene implements Scene {
   private rigs: Partial<Record<View, Rig>> = {};
   private hosts: Record<View, HTMLElement> = { in: el('div', 'eyes-view'), out: el('div', 'eyes-view') };
   private chips: Partial<Record<View, HTMLButtonElement>> = {};
-  private view: View = 'in';
+  private view: View = 'out';
   private disposed = false;
   private cleanup: (() => void)[] = [];
   private mouse: { x: number; y: number } | null = null;
@@ -207,7 +207,7 @@ export class EyesScene implements Scene {
   init(ctx: SceneContext) {
     this.ctx = ctx;
     this.stage.append(this.hosts.in, this.hosts.out);
-    this.hosts.in.classList.add('on');
+    this.hosts.out.classList.add('on');
     ctx.overlay.append(this.stage, this.buildUI());
     for (const v of ['in', 'out'] as const) void this.load(v);
     const on = <K extends keyof WindowEventMap>(type: K, fn: (e: WindowEventMap[K]) => void) => {
