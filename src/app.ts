@@ -189,8 +189,8 @@ function syncChrome() {
 async function openGame(index: number) {
   if (!scenes[index]?.create) return;
   if (!tracking && !unlocked) {
-    const error = await host.startTracking();
-    if (error) chrome.setStatus(`${error} Using your mouse instead.`);
+    // Camera denied or missing: the game opens anyway, in mouse mode.
+    await host.startTracking();
   }
   unlocked = true;
   go(index);

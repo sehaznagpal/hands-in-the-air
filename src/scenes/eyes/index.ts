@@ -103,7 +103,7 @@ function rigFace(host: HTMLElement): Rig {
     return {
       inner,
       rest: { x: cx - (pb.x + pb.width / 2), y: cy - (pb.y + pb.height / 2) },
-      rangeX: (eb.width - pb.width) / 2 + 6,
+      rangeX: (eb.width - pb.width) / 2 + 4,
       rangeY: eb.height * 0.12,
       cx,
       cy,

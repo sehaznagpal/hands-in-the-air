@@ -258,7 +258,14 @@ async function loadFace() {
   const doc = new DOMParser().parseFromString(text, 'image/svg+xml');
   const path = (id: string) => new Path2D(doc.getElementById(id)?.getAttribute('d') ?? '');
   const eyes = { left: path('eye-left'), right: path('eye-right') };
-  const pupils = { left: path('pupil-left'), right: path('pupil-right') };
+  const round = (id: string) => {
+    const e = doc.getElementById(id)!;
+    const n = (k: string) => Number(e.getAttribute(k));
+    const p = new Path2D();
+    p.ellipse(n('cx'), n('cy'), n('rx'), n('ry'), 0, 0, Math.PI * 2);
+    return p;
+  };
+  const pupils = { left: round('pupil-left'), right: round('pupil-right') };
   doc.getElementById('pupil-left')?.remove();
   doc.getElementById('pupil-right')?.remove();
   const url = URL.createObjectURL(new Blob([new XMLSerializer().serializeToString(doc)], { type: 'image/svg+xml' }));
@@ -300,7 +307,7 @@ function eyesPreview() {
           const dy = (hp.y - 0.5) * 2 * 4;
           g.save();
           g.clip(f.eyes[side]);
-          g.translate(dx + 20, dy);
+          g.translate(dx, dy);
           g.fillStyle = '#000';
           g.fill(f.pupils[side]);
           g.restore();
