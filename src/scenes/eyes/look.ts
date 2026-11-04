@@ -15,7 +15,7 @@ export const TUNING = {
   /** Seconds a startle takes to settle, and the least time between two. */
   STARTLE_TIME: 0.5,
   STARTLE_GAP: 1.2,
-  /** Head tilt toward the hand, in degrees, in ZOOM OUT. */
+  /** Head tilt toward the hand, in degrees, toward the hand. */
   TILT_DEG: 5,
 };
 

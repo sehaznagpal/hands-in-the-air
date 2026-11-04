@@ -254,7 +254,7 @@ function foggyWindowPreview() {
 
 // ------------------------------------------------------------------- eyes
 
-/** The zoomed-out figure with her pupils taken out, and the pupil outlines so they can be drawn moving. */
+/** The figure with her pupils taken out, and the pupil outlines so they can be drawn moving. */
 async function loadFigure() {
   const text = await (await fetch('/characters/body.svg')).text();
   const doc = new DOMParser().parseFromString(text, 'image/svg+xml');

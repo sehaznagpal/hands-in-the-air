@@ -465,7 +465,9 @@ button:focus-visible { outline: 3px solid var(--blue); outline-offset: 3px; }
   border-radius: clamp(12px, 1.1vw, 20px);
   transition: transform 200ms ease, box-shadow 200ms ease;
 }
-.photo-frame img { position: absolute; inset: 0; width: 100%; height: 100%; display: block; object-fit: cover; object-position: 50% 55%; }
+.photo-frame img, .photo-frame canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+/* Cover fit, centred; the skeleton canvas uses the same fit (PHOTO_FOCUS_Y in about.ts). */
+.photo-frame img { object-fit: cover; object-position: 50% 50%; }
 .about-photo:hover .photo-frame { transform: translateY(-4px); box-shadow: 0 10px 20px rgba(0, 0, 0, 0.22); }
 .about-photo:focus-visible { outline: 3px solid var(--blue); outline-offset: 4px; border-radius: 20px; }
 .about-by { position: absolute; top: calc(100% + 12px); left: 0; right: 0; text-align: center; font-size: 16px; line-height: 24px; color: var(--blue); text-decoration: none; }
