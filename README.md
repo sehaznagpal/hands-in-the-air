@@ -29,6 +29,8 @@ Live: https://hands-in-the-air.vercel.app · Repo: https://github.com/sehaznagpa
 
 ## Theme
 
+The favicon set (`public/favicon.*`, `apple-touch-icon.png`, `icon-*.png`, `site.webmanifest`) is generated from the brand colours in `src/style.css` with `npm run icons`; the files are committed.
+
 Colours and fonts are CSS variables at the top of `src/style.css`
 (`--bg`, `--ink`, `--orange`, `--blue`). Fonts (Clash Grotesk, Atelier) are in `public/fonts`.
 

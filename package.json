@@ -5,6 +5,7 @@
   "type": "module",
   "scripts": {
     "setup:assets": "node scripts/copy-wasm.mjs",
+    "icons": "node scripts/make-icons.mjs",
     "postinstall": "node scripts/copy-wasm.mjs",
     "dev": "vite",
     "build": "node scripts/copy-wasm.mjs && tsc --noEmit && vite build",
