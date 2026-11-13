@@ -18,6 +18,3 @@ export const scenes: SceneEntry[] = [
   { id: 'eyes', name: 'My Eyes Follow You', hash: 'eyes', create: () => new EyesScene() },
   { id: 'mesh', name: 'Mesh Bag Marbles', hash: 'mesh', create: () => new MeshScene() },
 ];
-
-/** Old hashes that still work. */
-export const HASH_ALIASES: Record<string, string> = { netbag: 'mesh' };

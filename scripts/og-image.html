@@ -1,0 +1,76 @@
+<!doctype html>
+<!--
+  One-off generator for public/og.png (1200 x 630). Not shipped: it lives outside public/.
+  Run `npm run dev`, open http://localhost:5173/scripts/og-image.html, and press the button: the page draws the
+  image with the site's own fonts and hand-skeleton code and saves it to public/og.png through a tiny local receiver:
+    node scripts/og-receiver.mjs
+-->
+<html lang="en">
+  <body style="margin:0;background:#222">
+    <canvas id="c" width="1200" height="630" style="display:block;width:1200px;height:630px"></canvas>
+    <script type="module">
+      import { drawGuideHand } from '/src/guide/cell.ts';
+
+      const W = 1200;
+      const H = 630;
+      const BG = '#dad1ca';
+      const ORANGE = '#c54812';
+      const BLUE = '#0a3699';
+      const atelier = new FontFace('Atelier', "url('/fonts/Atelier.otf')");
+      const clash = new FontFace('Clash Grotesk', "url('/fonts/ClashGrotesk-Variable.ttf')", { weight: '200 700' });
+      await Promise.all([atelier.load(), clash.load()]);
+      document.fonts.add(atelier);
+      document.fonts.add(clash);
+
+      const g = document.getElementById('c').getContext('2d');
+      g.fillStyle = BG;
+      g.fillRect(0, 0, W, H);
+
+      // The headline: orange with a blue offset, like the welcome page (offset -0.05em, +0.07em).
+      const lines = ['THROW YOUR HANDS', 'IN THE AIR!'];
+      let size = 120;
+      g.font = `400 ${size}px Atelier`;
+      g.letterSpacing = `${-0.04 * size}px`;
+      size = Math.floor((size * 860) / g.measureText(lines[0]).width);
+      g.font = `400 ${size}px Atelier`;
+      g.letterSpacing = `${-0.04 * size}px`;
+      g.textAlign = 'center';
+      g.textBaseline = 'alphabetic';
+      lines.forEach((t, i) => {
+        const y = 165 + i * size * 1.02;
+        g.fillStyle = BLUE;
+        g.fillText(t, W / 2 - 0.05 * size, y + 0.07 * size);
+        g.fillStyle = ORANGE;
+        g.fillText(t, W / 2, y);
+      });
+
+      // Two hand skeletons, drawn by the same function as the help cards (white lines, orange fingertip dots).
+      const hand = (x, y, rot) => {
+        g.save();
+        g.shadowColor = 'rgba(18,18,18,0.85)';
+        g.shadowBlur = 4;
+        drawGuideHand(g, W, H, { x, y, rotation: rot, scale: 1, blend: 0, v: 0, alpha: 1 }, ORANGE, 0.4);
+        g.restore();
+      };
+      hand(0.3, 0.7, -0.2);
+      hand(0.7, 0.7, 0.2);
+
+      g.font = '500 26px "Clash Grotesk"';
+      g.letterSpacing = '0px';
+      g.fillStyle = '#121212';
+      g.fillText('by Sehaz Nagpal', W / 2, 585);
+
+      document.title = `drawn ${size}`;
+      const btn = document.createElement('button');
+      btn.textContent = 'Save to public/og.png';
+      btn.style.cssText = 'position:fixed;top:8px;right:8px;font-size:18px;padding:6px 12px';
+      btn.onclick = async () => {
+        const blob = await new Promise((r) => document.getElementById('c').toBlob(r, 'image/png'));
+        const res = await fetch('http://localhost:8799/', { method: 'POST', body: blob });
+        btn.textContent = res.ok ? 'Saved' : 'Failed';
+      };
+      document.body.append(btn);
+      window.__save = () => btn.onclick();
+    </script>
+  </body>
+</html>

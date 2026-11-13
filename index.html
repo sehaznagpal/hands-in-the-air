@@ -3,10 +3,7 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-    <title>Throw Your Hands in the Air</title>
-    <meta name="description" content="Throw your hands in the air to do random cool things. Hand-tracking toys that run in your browser; your video stays on your device." />
-    <meta property="og:title" content="Throw Your Hands in the Air" />
-    <meta property="og:description" content="Throw your hands in the air to do random cool things." />
+    <!--seo:start--><!--seo:end-->
     <link rel="icon" href="/favicon.ico?v=2" sizes="48x48" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg?v=2" />
     <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32.png?v=2" />
@@ -14,6 +11,8 @@
     <link rel="apple-touch-icon" href="/apple-touch-icon.png?v=2" />
     <link rel="manifest" href="/site.webmanifest?v=2" />
     <meta name="theme-color" content="#0a3699" />
+    <link rel="preload" href="/fonts/Atelier.otf" as="font" type="font/otf" crossorigin />
+    <link rel="preload" href="/fonts/ClashGrotesk-Variable.ttf" as="font" type="font/ttf" crossorigin />
     <link rel="stylesheet" href="/src/style.css" />
   </head>
   <body>
@@ -32,30 +31,34 @@
           <p id="message" role="status" aria-live="polite"></p>
         </div>
         <div class="welcome-bottom">
-          <a class="welcome-foot" href="https://sehaznagpal.vercel.app" target="_blank" rel="noopener">by sehaz nagpal</a>
+          <a class="welcome-foot" href="https://sehaznagpal.vercel.app" target="_blank" rel="me noopener">made by sehaz nagpal</a>
           <button id="welcome-about" class="pill round" type="button" aria-label="About">i</button>
         </div>
       </section>
 
       <section id="about" aria-labelledby="about-title" hidden>
-        <a id="about-back" class="about-back" href="#welcome">&larr; Back</a>
+        <a id="about-back" class="about-back" href="/">&larr; Back</a>
         <div class="about-inner">
           <h1 id="about-title" class="display">ABOUT</h1>
           <div class="about-intro">
             <p class="about-text">Throw Your Hands in the Air turns your webcam into a controller. It uses hand tracking, a computer vision technique that finds 21 points on each of your hands, built on Google's open-source MediaPipe. It runs right inside your browser and follows your fingers in real time, so you can wipe, pinch, grab and wave your way through a few playful experiments. It's safe to use. Nothing here is recorded or uploaded, there's no backend, and your video never leaves your computer. I made this to play with what hands can do on a screen, and built it with the help of AI. Pick any game below to begin, and if it's your first time, start with the warm up.</p>
             <div class="about-person">
-              <a class="about-photo" href="https://sehaznagpal.vercel.app" target="_blank" rel="noopener" aria-label="Sehaz Nagpal's portfolio">
+              <a class="about-photo" href="https://sehaznagpal.vercel.app" target="_blank" rel="me noopener" aria-label="Sehaz Nagpal's portfolio">
                 <div class="photo-frame">
-                  <img id="about-img" src="/about/sehaz.webp" alt="Sehaz Nagpal smiling with both hands raised" />
+                  <img id="about-img" src="/about/sehaz.webp" alt="Sehaz Nagpal, product designer, smiling with hand-tracking skeleton over her hands" />
                   <canvas id="about-skeleton" aria-hidden="true"></canvas>
                 </div>
               </a>
-              <a class="about-by" href="https://sehaznagpal.vercel.app" target="_blank" rel="noopener">by sehaz nagpal &#8599;</a>
+              <a class="about-by" href="https://sehaznagpal.vercel.app" target="_blank" rel="me noopener">by sehaz nagpal &#8599;</a>
             </div>
           </div>
-          <ul id="about-cards" class="about-cards"></ul>
+          <ul id="about-cards" class="about-cards"><!--cards--><!--/cards--></ul>
+          <p class="about-foot"><a href="https://sehaznagpal.vercel.app" target="_blank" rel="me noopener">made by sehaz nagpal</a></p>
         </div>
       </section>
+
+      <!--page-h1--><!--/page-h1-->
+      <noscript><p class="noscript">This app needs JavaScript and a webcam. Made by Sehaz Nagpal, product designer: <a href="https://sehaznagpal.vercel.app">https://sehaznagpal.vercel.app</a></p></noscript>
 
       <div id="mock-badge" hidden>Simulated hands (?mock=1)</div>
 

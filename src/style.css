@@ -549,3 +549,12 @@ button:focus-visible { outline: 3px solid var(--blue); outline-offset: 3px; }
 /* Blooming Flowers: the Reset button sits on the ledge under the vases. */
 .bloom-reset { position: absolute; translate: -50% 0; font-size: 20px; line-height: 28px; padding: 4px 18px; }
 .bloom-reset[hidden] { display: none; }
+
+/* Search and no-JavaScript additions */
+.about-foot { margin: 48px 0 0; text-align: center; font-size: 15px; line-height: 20px; }
+.about-foot a { color: inherit; text-decoration: none; }
+.about-foot a:hover { text-decoration: underline; text-underline-offset: 3px; }
+.noscript { position: absolute; z-index: 30; left: 0; right: 0; bottom: 96px; margin: 0; padding: 0 var(--edge); text-align: center; font-size: 16px; line-height: 1.4; }
+.noscript a { color: var(--blue); }
+/* The cards are real links now. */
+a.about-card { color: inherit; text-decoration: none; }

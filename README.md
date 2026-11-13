@@ -17,7 +17,7 @@ npm test           # unit tests for the hand signals
 npm run build      # static output in dist/ (works on Vercel as-is)
 ```
 
-The app opens on a **welcome page**: **Turn on camera to start** asks for the camera and opens **Warm Up: Canvas** (if the camera is blocked it opens in mouse mode instead). The round **i** button opens **About** (`#about`): what the app is, and a card for each game (**Warm Up: Canvas**, **Foggy Window**, **Sorting Game**, **My Eyes Follow You**, **Mesh Bag Marbles**; **Blooming Flowers**). Routes: `#welcome` (default), `#about`, `#canvas`, `#window`, `#sort`, `#bloom`, `#eyes` and `#mesh` (the old `#netbag` redirects to `#mesh`). A game link without camera access or mouse mode goes to the welcome page first. The camera is shared, so switching games never restarts it. Bottom left, in a game: **?** (help), **i** (About) and **stop camera**, which also returns to the welcome page. The preview (bottom right, always 16:9, `--preview-w` in `src/style.css`) can be minimised to a round button. No camera? Open `/?mock=1` for two simulated hands (`?mock=idle` shows the simulated camera with no hands, handy for layout checks).
+The app opens on a **welcome page**: **Turn on camera to start** asks for the camera and opens **Warm Up: Canvas** (if the camera is blocked it opens in mouse mode instead). The round **i** button opens **About** (`/about`): what the app is, and a card for each game (**Warm Up: Canvas**, **Foggy Window**, **Sorting Game**, **My Eyes Follow You**, **Mesh Bag Marbles**; **Blooming Flowers**). Routes are real paths: `/` (welcome), `/about`, `/canvas`, `/foggy-window`, `/sorting-game`, `/blooming-flowers`, `/my-eyes-follow-you` and `/mesh-bag-marbles`. Old hash links (`#about`, `#window`, `#netbag`, ...) redirect to them. A game link without camera access or mouse mode shows the welcome page first, and the start button then opens that game. The camera is shared, so switching games never restarts it. Bottom left, in a game: **?** (help), **i** (About) and **stop camera**, which also returns to the welcome page. The preview (bottom right, always 16:9, `--preview-w` in `src/style.css`) can be minimised to a round button. No camera? Open `/?mock=1` for two simulated hands (`?mock=idle` shows the simulated camera with no hands, handy for layout checks).
 
 Live: https://hands-in-the-air.vercel.app · Repo: https://github.com/sehaznagpal/hands-in-the-air
 
@@ -26,6 +26,10 @@ Live: https://hands-in-the-air.vercel.app · Repo: https://github.com/sehaznagpa
 | `D` | Debug overlay: skeleton, fingertip ids 1-10, FPS, detection time, live signals |
 | `1`-`6` | Switch game (also the tabs at the top centre; arrow keys work inside them) |
 | `` ` `` | Hidden dev menu (scene picker). `?scene=<id>` also works |
+
+## Search (SEO)
+
+`src/routes.ts` lists every page with its title, description and old hash links. At build, `scripts/seo-plugin.ts` writes one prerendered HTML file per route (`about.html`, `canvas.html`, ...), each with its own title, description, canonical, Open Graph and Twitter tags, JSON-LD (WebApplication with its author Person), the right visible page, exactly one `<h1>` and a `<noscript>` note; Vercel serves them at `/about` etc. (`vercel.json`: `cleanUrls`). The same plugin writes `public/sitemap.xml` (all routes, today's date) on every build. `public/robots.txt`, `public/404.html` (a real 404 on Vercel) and `public/og.png` (1200 x 630, drawn by `scripts/og-image.html` in `npm run dev` with `node scripts/og-receiver.mjs`) complete it. To verify Google Search Console, put its tag at the `google-site-verification` comment in `scripts/seo-plugin.ts`. The MediaPipe model and WASM load only after the camera is turned on.
 
 ## Theme
 
@@ -78,7 +82,7 @@ thumb to pinky.
 a slow vertical slide and an occasional swipe) running through the same signal
 pipeline. Use it for testing and as a fallback demo.
 
-## Mesh Bag Marbles (`#mesh`)
+## Mesh Bag Marbles (`/mesh-bag-marbles`)
 
 A hanging orange mesh bag that holds 0 to 25 balls. The bag lengthens and bulges to
 match the count, swings from its hook like a pendulum, and the balls slosh inside.
@@ -118,18 +122,18 @@ unit-tested headless: `npm test`.
 - `public/models/hand_landmarker.task` is the official float16 model. The WASM files
   are copied from `node_modules` into `public/wasm` on `npm install` and before each build.
 
-## Foggy Window (`#window`)
+## Foggy Window (`/foggy-window`)
 
 A fogged window over a photo. An open palm wipes wide, one extended finger draws a thin line (both hands at once); the mouse drags to wipe and Shift draws thin. Wiped glass fogs over again in about 20 seconds, with condensation beads, edge beads and now and then a drip. `F` or **Fog it up** re-fogs everything; `B` / `Shift+B` or the options on the left switch the photo (Neon city, Nature, Calm city), shown cover-fit and centred. The photos are `public/backgrounds/neon-city.webp`, `nature.webp` and `calm-city.webp`; any other `.jpg`, `.jpeg` or `.webp` you drop in that folder becomes an extra option after restarting `npm run dev` (or rebuilding). The fog lightening is tuned per photo (`fog` in `src/scenes/window/backgrounds.ts`). The code is in `src/scenes/window/`: the mask, fog layer, beads and drips are in `fog.ts`.
 
-## Sorting Game (`#sort`)
+## Sorting Game (`/sorting-game`)
 
 A gentle endless game: one marble at a time floats down from a chute, and you put it on the shelf that has the same marble. Each shelf shows one design as a label marble below it, centred; only designs that are on a shelf drop, and the three shelf designs always look clearly different (they come from different groups in `DESIGN_GROUPS`). Pinch thumb and index near the marble to grab it; once held it stays held until the fingers are clearly open for 200 ms, and a lost hand is waited out for 600 ms. Release anywhere in a shelf's tall drop zone and the right marble slides into the next free slot (5 per shelf); a different design bounces off and costs a life. With the mouse, click a marble to pick it up and click again to place it. A marble that reaches the floor also costs a life; you have 5, and the game runs until they are gone. A full shelf pays +5, clears and takes a new design. The next marble comes 1.5 s after the last one is placed or lost, and the first game's first marble falls extra slowly with hints. The best score is kept in `localStorage`. Every tuning number is in the `TUNING` block at the top of `src/scenes/sort/game.ts`; the game logic has no DOM and is played by a bot in `game.test.ts`. The marble drawing is shared with Mesh Bag in `src/shared/marbles.ts`.
 
-## My Eyes Follow You (`#eyes`)
+## My Eyes Follow You (`/my-eyes-follow-you`)
 
 A girl whose eyes follow your hands (`src/scenes/eyes/`). Her pupils follow the palm of the nearest hand, smoothed. With two hands each eye follows a different one, crossed over, so she goes cross-eyed. She blinks every 3 to 6 seconds with a lid in her skin colour, looks slowly around when no hand is in view, and gives a small jump when a hand comes very close. With no camera the eyes follow the mouse and a click startles her. The whole girl (`public/characters/body.svg`) is the only view; her head tilts slightly toward the hand. The picture is exported from the Figma file; the animated layers are the SVG ids `pupil-left` and `pupil-right`. The tuning numbers are the `TUNING` block in `src/scenes/eyes/look.ts`.
 
-## Blooming Flowers (`#bloom`)
+## Blooming Flowers (`/blooming-flowers`)
 
 Five vases on a ledge, each holding a different plant, all drawn in code (`src/scenes/bloom/vases.ts`): a tall cylinder with berry branches, a round belly with wavy lines and a big cup flower, a ribbed vase with tulips, a checkerboard pot with pom flowers, and a small bowl with a trumpet flower. Colours are mainly the app's orange, blue and cream, with pink, lilac, olive and lime accents; shapes are flat with wobbly edges, some fills are printed slightly off-register, and a speckle grain covers everything. Each plant has a bloom value from 0 (closed buds, folded leaves) to 1 (flowers open, leaves spread, berries popped out). Only the horizontal position of a palm matters: the nearest vase blooms fully and its neighbours to about 0.3; a vase you move away from closes again over 1.5 s. Both hands work at once. Pinching over a vase keeps it open (with a small wiggle) and pinching again releases it. When all 5 are kept open the plants sway together and a **Reset** button appears. With no camera, hovering blooms and a click keeps a vase. The rules and numbers are in `src/scenes/bloom/logic.ts` (the `TUNING` block, unit-tested). The vases stand close together, and the whole row scales to fit a phone.

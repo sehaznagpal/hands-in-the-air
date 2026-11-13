@@ -5,8 +5,9 @@ import { HandSignals } from './hands';
 import { MockHands } from './mock';
 import type { Host, Scene, SceneContext } from './scene';
 import { About } from './about/about';
-import { HASH_ALIASES, scenes } from './scenes';
-import { createTracker, ModelError, type HandTracker } from './tracker';
+import { ROUTES, routeByHash, routeByPath, type RouteInfo } from './routes';
+import { scenes } from './scenes';
+import type { HandTracker } from './tracker';
 import { coverRect } from './view';
 
 const $ = <T extends HTMLElement>(id: string) => document.getElementById(id) as T;
@@ -47,6 +48,7 @@ signals.on('swipe', (e) => debug.note(`${e.hand} swipe ${e.direction} ${e.speed.
 
 let camera: Camera | null = null;
 let tracker: HandTracker | null = null;
+let modelError: (typeof import('./tracker'))['ModelError'] | null = null;
 let tracking = false;
 let starting = false;
 let lastVideoTime = -1;
@@ -80,11 +82,14 @@ const host: Host = {
     starting = true;
     try {
       camera = await startCamera(video);
-      tracker = await createTracker();
+      // The hand model and its WASM load only now, after the camera is on, not with the first page.
+      const mod = await import('./tracker');
+      modelError = mod.ModelError;
+      tracker = await mod.createTracker();
     } catch (err) {
       camera?.stop();
       camera = null;
-      return err instanceof CameraError || err instanceof ModelError
+      return err instanceof CameraError || (modelError && err instanceof modelError)
         ? err.message
         : 'Something went wrong starting up. Reload and try again.';
     } finally {
@@ -143,8 +148,10 @@ type Page = 'welcome' | 'about' | 'scene';
 let page: Page = 'welcome';
 /** True once the camera was allowed this visit, or mouse mode was chosen (camera denied); scenes open only then. */
 let unlocked = false;
+/** A game page opened by its link before the camera was on: the start button opens that game. */
+let intended = -1;
 
-const about = new About(scenes, (entry) => void openGame(scenes.indexOf(entry)));
+const about = new About(scenes);
 
 function setScene(index: number) {
   const entry = scenes[index];
@@ -193,6 +200,7 @@ async function openGame(index: number) {
     await host.startTracking();
   }
   unlocked = true;
+  intended = -1;
   go(index);
 }
 
@@ -223,38 +231,101 @@ function syncToggle() {
   });
 }
 
-/** Scene named by the URL hash, or -1. Old hashes are mapped through HASH_ALIASES. */
-function sceneFromUrl() {
-  const raw = location.hash.replace(/^#\/?/, '').toLowerCase();
-  const hash = HASH_ALIASES[raw] ?? raw;
-  return scenes.findIndex((s) => s.hash === hash && !s.soon);
+const sceneIndexOf = (r: RouteInfo) => scenes.findIndex((sc) => sc.id === r.id && !!sc.create);
+const pathOf = (index: number) => ROUTES.find((r) => r.id === scenes[index].id)!.path;
+const currentRoute = () => routeByPath(location.pathname) ?? ROUTES[0];
+
+/** Old links such as /#about or /#netbag become real paths. */
+function fixLegacyHash() {
+  if (!location.hash) return;
+  const r = routeByHash(location.hash);
+  if (r) history.replaceState(null, '', r.path + location.search);
 }
 
-/** Changing the hash adds a history entry, so back and forward just work. */
+/** Keep the title, description and canonical in step with the page shown (the HTML already has them on load). */
+function setMeta(r: RouteInfo) {
+  document.title = r.title;
+  const url = r.path === '/' ? location.origin + '/' : location.origin + r.path;
+  const set = (sel: string, attr: string, value: string) => document.head.querySelector(sel)?.setAttribute(attr, value);
+  set('meta[name="description"]', 'content', r.description);
+  set('link[rel="canonical"]', 'href', url);
+  set('meta[property="og:title"]', 'content', r.title);
+  set('meta[property="og:description"]', 'content', r.description);
+  set('meta[property="og:url"]', 'content', url);
+  set('meta[name="twitter:title"]', 'content', r.title);
+  set('meta[name="twitter:description"]', 'content', r.description);
+  // One <h1> per page: the visible title carries it; the game title is a hidden heading.
+  for (const [id, on] of [['welcome-title', r.id === 'welcome'], ['about-title', r.id === 'about']] as const) {
+    const el = document.getElementById(id);
+    if (!el) continue;
+    if (on) {
+      el.setAttribute('role', 'heading');
+      el.setAttribute('aria-level', '1');
+    } else if (el.tagName !== 'H1') {
+      el.removeAttribute('role');
+      el.removeAttribute('aria-level');
+    }
+  }
+  let h1 = document.getElementById('game-title');
+  if (r.name) {
+    if (!h1) {
+      h1 = document.createElement('h1');
+      h1.id = 'game-title';
+      h1.className = 'sr-only';
+      app.appendChild(h1);
+    }
+    h1.textContent = r.name;
+  } else h1?.remove();
+}
+
+/** Go to a path: a new history entry, so back and forward just work. */
+function navigate(path: string) {
+  if (location.pathname !== path || location.hash) history.pushState(null, '', path);
+  route();
+}
+
+/** Open a game by its index (a tab, a key). */
 function go(index: number) {
-  const target = '#' + scenes[index].hash;
-  if (location.hash === target) route();
-  else location.hash = target;
+  navigate(pathOf(index));
 }
 
-/** Show what the URL says; scenes need the camera or mouse mode, otherwise the visitor goes to the welcome page first. */
+/** Show what the URL says; games need the camera or mouse mode, otherwise the welcome page shows first (the URL stays). */
 function route() {
-  const raw = location.hash.replace(/^#\/?/, '').toLowerCase();
-  if (raw === 'about') {
+  const r = currentRoute();
+  if (r.id === 'about') {
+    setMeta(r);
     showPage('about');
     return;
   }
-  const i = sceneFromUrl();
+  const i = r.id === 'welcome' ? -1 : sceneIndexOf(r);
   if (i < 0 || !unlocked) {
-    if (i >= 0) history.replaceState(null, '', '#welcome');
+    if (i >= 0) intended = i;
+    setMeta(r);
     showPage('welcome');
     return;
   }
+  setMeta(r);
   setScene(i);
   if (page !== 'scene') showPage('scene');
 }
 
-window.addEventListener('hashchange', route);
+window.addEventListener('popstate', route);
+window.addEventListener('hashchange', () => {
+  fixLegacyHash();
+  route();
+});
+// Links to our own pages are handled here, without a page load.
+app.addEventListener('click', (e) => {
+  const a = (e.target as Element).closest('a');
+  if (!a || a.target || e.defaultPrevented || e.button || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
+  const url = new URL(a.href, location.href);
+  const r = url.origin === location.origin ? routeByPath(url.pathname) : undefined;
+  if (!r) return;
+  e.preventDefault();
+  const i = r.name ? sceneIndexOf(r) : -1;
+  if (i >= 0) void openGame(i);
+  else navigate(r.path);
+});
 
 toggle.addEventListener('keydown', (e) => {
   if (!unlocked) return;
@@ -363,19 +434,20 @@ startBtn.addEventListener('click', async () => {
   if (starting) return;
   startBtn.classList.add('starting');
   message.textContent = '';
-  await openGame(0);
+  await openGame(intended >= 0 ? intended : 0);
   startBtn.classList.remove('starting');
 });
-$('welcome-about').addEventListener('click', () => (location.hash = '#about'));
-$('about-btn').addEventListener('click', () => (location.hash = '#about'));
+$('welcome-about').addEventListener('click', () => navigate('/about'));
+$('about-btn').addEventListener('click', () => navigate('/about'));
 chrome.onStopCamera = () => {
   unlocked = false;
-  location.hash = '#welcome';
+  navigate('/');
 };
 
 window.addEventListener('pagehide', () => host.stopTracking());
 
 syncChrome();
+fixLegacyHash();
 route();
 lastFrame = performance.now();
 rafId = requestAnimationFrame(frame);

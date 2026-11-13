@@ -5,16 +5,6 @@ import { drawSkeleton } from '../skeleton';
 import hands from './sehaz-hands.json';
 import { createPreviews } from './previews';
 
-/** Card titles always sit on two lines; this is where each one breaks. */
-const TITLE_LINES: Record<string, [string, string]> = {
-  canvas: ['Warm Up:', 'Canvas'],
-  window: ['Foggy', 'Window'],
-  sort: ['Sorting', 'Game'],
-  bloom: ['Blooming', 'Flowers'],
-  eyes: ['My Eyes', 'Follow You'],
-  mesh: ['Mesh Bag', 'Marbles'],
-};
-
 /** Where the photo sits inside its frame (the same as `object-position` in the stylesheet): centred. */
 const PHOTO_FOCUS_Y = 0.5;
 
@@ -54,46 +44,23 @@ function startPhotoSkeleton(canvas: HTMLCanvasElement, img: HTMLImageElement) {
 export class About {
   private el = document.getElementById('about')!;
   private list = document.getElementById('about-cards')!;
-  private cards: { entry: SceneEntry; el: HTMLButtonElement; cell?: GuideCell }[] = [];
+  private cards: { entry: SceneEntry; el: HTMLAnchorElement; cell?: GuideCell }[] = [];
   private visible = new Set<GuideCell>();
   private shown = false;
 
-  constructor(
-    entries: SceneEntry[],
-    private onPick: (entry: SceneEntry) => void,
-  ) {
+  /** The cards are real links in the page's HTML; this adds each one's looping preview. */
+  constructor(entries: SceneEntry[]) {
     startPhotoSkeleton(document.getElementById('about-skeleton') as HTMLCanvasElement, document.getElementById('about-img') as HTMLImageElement);
     const previews = createPreviews();
+    const links = this.list.querySelectorAll<HTMLAnchorElement>('a.about-card');
     for (const entry of entries) {
-      const li = document.createElement('li');
-      const card = document.createElement('button');
-      card.type = 'button';
-      card.className = 'about-card' + (entry.soon ? ' soon' : '');
-      card.setAttribute('aria-label', entry.name + (entry.soon ? ' (coming soon)' : ''));
+      const card = links[this.cards.length] as HTMLAnchorElement | undefined;
+      if (!card || entry.soon) continue;
       const cell = previews[entry.id];
       if (cell) {
         cell.el.setAttribute('aria-hidden', 'true');
-        card.append(cell.el);
+        card.prepend(cell.el);
       }
-      const [a, b] = TITLE_LINES[entry.id] ?? [entry.name, ''];
-      const title = document.createElement('h2');
-      title.setAttribute('aria-hidden', 'true');
-      title.append(a, document.createElement('br'), b);
-      card.append(title);
-      if (entry.soon) {
-        const tag = document.createElement('span');
-        tag.className = 'soon-tag';
-        tag.textContent = 'coming soon';
-        tag.setAttribute('aria-hidden', 'true');
-        card.append(tag);
-        card.setAttribute('aria-disabled', 'true');
-        card.tabIndex = -1;
-      }
-      card.addEventListener('click', () => {
-        if (!entry.soon) this.onPick(entry);
-      });
-      li.append(card);
-      this.list.append(li);
       this.cards.push({ entry, el: card, cell });
     }
     // Previews only play while their card is on screen.
