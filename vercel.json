@@ -1,4 +1,76 @@
 {
-  "cleanUrls": true,
-  "trailingSlash": false
+  "cleanUrls": false,
+  "trailingSlash": false,
+  "redirects": [
+    {
+      "source": "/index.html",
+      "destination": "/",
+      "permanent": true
+    },
+    {
+      "source": "/about.html",
+      "destination": "/about",
+      "permanent": true
+    },
+    {
+      "source": "/canvas.html",
+      "destination": "/canvas",
+      "permanent": true
+    },
+    {
+      "source": "/foggy-window.html",
+      "destination": "/foggy-window",
+      "permanent": true
+    },
+    {
+      "source": "/sorting-game.html",
+      "destination": "/sorting-game",
+      "permanent": true
+    },
+    {
+      "source": "/blooming-flowers.html",
+      "destination": "/blooming-flowers",
+      "permanent": true
+    },
+    {
+      "source": "/my-eyes-follow-you.html",
+      "destination": "/my-eyes-follow-you",
+      "permanent": true
+    },
+    {
+      "source": "/mesh-bag-marbles.html",
+      "destination": "/mesh-bag-marbles",
+      "permanent": true
+    }
+  ],
+  "rewrites": [
+    {
+      "source": "/about",
+      "destination": "/about.html"
+    },
+    {
+      "source": "/canvas",
+      "destination": "/canvas.html"
+    },
+    {
+      "source": "/foggy-window",
+      "destination": "/foggy-window.html"
+    },
+    {
+      "source": "/sorting-game",
+      "destination": "/sorting-game.html"
+    },
+    {
+      "source": "/blooming-flowers",
+      "destination": "/blooming-flowers.html"
+    },
+    {
+      "source": "/my-eyes-follow-you",
+      "destination": "/my-eyes-follow-you.html"
+    },
+    {
+      "source": "/mesh-bag-marbles",
+      "destination": "/mesh-bag-marbles.html"
+    }
+  ]
 }
